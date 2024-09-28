@@ -71,7 +71,7 @@ jobs:
       - name: Build blog project
         run: |
           echo ${{ github.workspace }}
-          pnpm build
+          pnpm run docs:build
 
         # 资源拷贝
       - name: Build with Jekyll
