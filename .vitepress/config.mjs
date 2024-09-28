@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  base: 'markdown',
+  base: '/markdown/',
   title: "Mzmm知识库",
   description: "share knowledge",
   head: [["link", { rel: "icon", href: "/logo.svg" }]],
