@@ -21,7 +21,9 @@ export default defineConfig({
           { text: 'vue全家桶', link: '/web/myrouter/router' },
           { text: 'css&js', link: '/web/css-js/css-js' },
           { text: 'ts', link: '/web/myts/ts' },
-          { text: 'threejs', link: 'web/thressjs/threejs' }
+          { text: 'threejs', link: 'web/thressjs/threejs' },
+          { text: 'nodejs', link: 'web/nodejs/nodejs' },
+          { text: 'nuxtjs', link: 'web/nuxtjs/nuxtjs' }
         ]
       },
       {
