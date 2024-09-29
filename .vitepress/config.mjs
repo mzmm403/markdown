@@ -18,7 +18,7 @@ export default defineConfig({
         text: '前端',
         items: [
           { text: 'vue', link: '/web/vuejs/vue' },
-          { text: 'vue-router', link: '/web/myrouter/router' },
+          { text: 'vue全家桶', link: '/web/myrouter/router' },
           { text: 'css&js', link: '/web/css-js/css-js' },
           { text: 'ts', link: '/web/myts/ts' },
           { text: 'threejs', link: 'web/thressjs/threejs' }
