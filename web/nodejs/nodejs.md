@@ -1,3 +1,26 @@
+## node的版本控制器
+
+> nvm
+
+```shell
+# 安装
+nvm install
+# 卸载
+nvm uninstall
+# 查看当前安装的列表
+nvm list
+# 切换版本
+nvm use
+```
+
+## 代码提示安装的包
+
+> 让代码提示更全
+
+```shell
+npm i -D @types/node
+```
+
 ## node核心
 
 ### node概述
@@ -667,3 +690,650 @@ const delay = util.promisify(delayCallBack)
 
 delay(500).then(d => console.log(d))
 ```
+
+
+### 文件I/O
+
+> IO的速度往往低于内存和CPU的交互速度
+
+> [fs模块的文档](https://nodejs.org/docs/latest/api/fs.html)
+
+#### 读取文件
+
+##### fs.readFile()
+
+- 参数
+    - path `<string>` 目标文件的路径
+    - options `<obj>` 可选项配置
+        - encoding `<string>` 编码类型
+        - flag `<string>` 文件模式，默认值为 'r'
+        - signal `<AbortSignal>` 允许中止正在进行的读取文件
+    - callback `<Function>` 回调函数
+
+
+```js
+const fs = require("fs")
+const path = require("path")
+
+// 获取文件的绝对路径
+const filename =  path.resolve(__dirname,"./myfiles/1.txt")
+
+fs.readFile(filename,(err,content) => {
+    console.log(content)
+    console.log(content.toString("utf-8"))
+})
+// 不传入编码就是Buffer,传入就是按照编码解析
+fs.readFile(filename,"utf-8",(err,content) => {
+    console.log(content)
+    console.log(content.toString("utf-8"))
+})
+
+
+// readFile的同步方法
+// Sync函数是同步的，会阻塞JS的运行，极其影响性能
+// 通常，在程序启动时运行有限次数即可
+const content = fs.readFileSync(filename,"utf-8")
+console.log(content)
+```
+
+##### fs.promise.readFile()
+- 参数
+    - path `<string>` 目标文件的路径
+    - options `<obj>` 可选项配置
+        - encoding `<string>` 编码类型
+        - flag `<string>` 文件模式，默认值为 'r'
+        - signal `<AbortSignal>` 允许中止正在进行的读取文件
+- 返回值
+    - Promise `<Promise>` 错误和读取的内容
+
+
+```js
+const fs = require("fs")
+const path = require("path")
+// 获取文件的绝对路径
+const filename =  path.resolve(__dirname,"./myfiles/1.txt")
+async function test(){
+    const content = await fs.promises.readFile(filename,{encoding:"utf-8",flag:"r"})
+    console.log(content)
+}
+```
+
+#### 写入文件
+
+##### fs.writeFile()
+
+- 参数
+    - path `<string>` 目标文件的路径
+    - data `<string> | <Buffer> | <stream> 等` 要写的内容
+    - options `<obj>` 可选项配置
+        - encoding `<string>` 编码类型
+        - mode `<integer>` 默认值 `0o666` 设置权限
+        - flag `<string>` 文件模式，默认值为 'w'
+        - flush `<boolean>` 
+        - signal `<AbortSignal>` 允许中止正在进行的读取文件
+    - callback `<Function>` 回调函数
+
+```js
+const fs = require("fs")
+const path = require("path")
+// 获取文件的绝对路径
+const filename =  path.resolve(__dirname,"./myfiles/1.txt")
+
+// 如果这里的路径的文件不存在会自动创建，但是目录不存在就会报错
+fs.writeFile(filename,"mzmm",(err)=>{
+    if(!err){
+        console.log("写入成功")
+    }else{
+        console.log("写入失败")
+    }
+})
+
+
+// writeFile的同步模式
+fs.writeFileSync(filename,"mzmm")
+```
+
+##### fs.promise.writeFile()
+
+- 参数
+    - path `<string>` 目标文件的路径
+    - data `<string> | <Buffer> | <stream> 等` 要写的内容
+    - options `<obj>` 可选项配置
+        - encoding `<string>` 编码类型
+        - mode `<integer>` 默认值 `0o666`
+        - flag `<string>` 文件模式，默认值为 'w'
+        - flush `<boolean>` 
+        - signal `<AbortSignal>` 允许中止正在进行的读取文件
+- 返回值
+    - Promise `<Promise>` 成功后履行
+
+```js
+const fs = require("fs")
+const path = require("path")
+// 获取文件的绝对路径
+const filename =  path.resolve(__dirname,"./myfiles/1.txt")
+
+async function test() {
+    const buffer = Buffer.from("mzmm403","utf-8")
+    // flag:"a" 追加写入模式
+    // 如果这里的路径的文件不存在会自动创建，但是目录不存在就会报错
+    await fs.promises.writeFile(filename,buffer,{encoding:"utf-8",flag:"a"}) 
+    console.log("写入成功")
+}
+```
+
+#### 文件复制demo
+```js
+const fs = require("fs")
+const path = require("path")
+
+async function test() {
+    const filename =  path.resolve(__dirname,"./myfiles/1.jpg")
+    const content = await fs.promises.readFile(filename)
+    const filename1 =  path.resolve(__dirname,"./myfiles/1.copy.jpg")
+    await fs.promises.writeFile(filename1,content) 
+    console.log("写入成功")
+}
+test()
+```
+
+#### 获取文件或目录的信息
+
+> 返回的是文件的状态
+
+```js
+Stats {
+  dev: 12148368,
+  mode: 33206,
+  nlink: 1,
+  uid: 0,
+  gid: 0,
+  rdev: 0,
+  blksize: 4096,
+  ino: 75153818782251150,     
+  size: 8530,
+  blocks: 24,
+  atimeMs: 1727930690274.6682,
+  mtimeMs: 1727930326547.8286,
+  ctimeMs: 1727930335346.66,  
+  birthtimeMs: 1727930326080.8604,
+  atime: 2024-10-03T04:44:50.275Z,
+  mtime: 2024-10-03T04:38:46.548Z,
+  ctime: 2024-10-03T04:38:55.347Z,
+  birthtime: 2024-10-03T04:38:46.081Z
+}
+```
+
+- size：占用字节
+- atime：上次访问事件
+- mtime：上次文件内容被修改时间
+- ctime：上次文件状态被修改时间(比如访问权限)
+- birthime：文件创建时间
+- isDirectory()：判断是否是目录
+- isFile()：判断是否是文件
+
+
+##### fs.stat()
+
+- 参数
+    - path `<string> | <Buffer> | <URL>` 文件路径
+    - options
+        - bigint `<boolean>` 默认为false
+    - callback
+        - err `<Error>`
+        - stats `<fs.Stats>`
+
+
+```js
+const fs = require("fs")
+const path = require("path")
+
+const filename =  path.resolve(__dirname,"./myfiles/1.jpg")
+
+fs.stat(filename,(err,stats)=>{
+    console.log(stats)
+})
+
+
+// 同步函数
+const stats = fs.statSync(filename)
+console.log(stats)
+```
+
+
+##### fs.promise.stat()
+- 参数
+    - path `<string> | <Buffer> | <URL>` 文件路径
+    - options
+        - bigint `<boolean>` 默认为false
+- 返回
+    - Promise `<Promise>` 成功后履行
+
+```js
+const fs = require("fs")
+const path = require("path")
+
+const filename =  path.resolve(__dirname,"./myfiles/1.jpg")
+
+async function test() {
+    const stat = await fs.promises.stat(filename)
+    console.log(stat)
+}
+test()
+```
+
+
+#### 声明
+
+> 剩下的一些api都统一采用promise的形式记录，基本上都是回调，promise，同步这三个函数
+
+
+#### fs.promise.readdir()
+
+> 获取目录中的文件和子目录
+
+- 参数
+    - path `<string> | <Buffer> | <URL>` 文件路径
+    - options
+        - encoding `<string>` 默认是utf-8
+        - 使用文件类型 `<boolean>` 默认是false
+        - 递归 `<boolean>` 如果，则以迭代方式读取目录的内容。在循环模式下，它将列出所有文件、子文件和目录，默认false
+- 返回
+    - Promise `<Promise>` 成功后履行
+
+
+```js
+const fs = require("fs")
+const path = require("path")
+
+const filename =  path.resolve(__dirname,"./myfiles/")
+
+async function test() {
+    // 可以通过开启递归的方式深度获取
+    const pathes = await fs.promises.readdir(filename,{recursive:"true"})
+    console.log(pathes)
+    //[ '1.jpg', '1.txt', '2.jpg', 'sub', 'sub\\foo.txt' ]
+}
+test()
+```
+
+#### fs.promise.mkdir()
+
+> 创建目录
+
+- 参数
+    - path `<string> | <Buffer> | <URL>` 文件路径
+    - options
+        - 递归 `<boolean>` 如果，则以迭代方式读取目录的内容。在循环模式下，它将列出所有文件、子文件和目录，默认false
+        - mode `<string | <integer>` windwos不支持
+- 返回
+    - Promise `<Promise>` 成功后履行
+
+```js
+const fs = require("fs")
+const path = require("path")
+
+const filename =  path.resolve(__dirname,"./myfiles/test1/test2/test3")
+
+async function test() {
+    await fs.promises.mkdir(filename,{recursive:true})
+    console.log("创建成功")
+}
+test()
+```
+
+
+#### fs.exists()
+
+> 废弃，官方建议用fs.stat代替
+> 判断文件或者目录是否存在
+> 下面自己封装一个
+
+
+```js
+async function exists(filename) {
+    try{
+        await fs.promises.stat(filename)
+        return true
+    } catch (err) {
+        if(err.code === "ENOENT"){
+            // 文件不存在
+            return false
+        }
+        throw err
+    }
+}
+
+async function test() {
+    const res = await exists(filename)
+    if(res){
+        console.log("目录存在,可以后续操作")
+        // 后续的一些I/O
+    }else{
+        await fs.promise.mkdir(filename)
+        console.log("目录自动创建,继续后续操作")
+        // 后续的一些I/O
+    }
+}
+test()
+```
+
+#### fs.promise.unlink
+
+- 参数
+    - path `<string> | <Buffer> | <URL>` 文件路径
+- 返回值
+    - Promise `<Promise>` 成功后履行
+
+```js
+const fs = require("fs")
+const path = require("path")
+
+const filename =  path.resolve(__dirname,"./myfiles/test1/test2/test3")
+
+async function test(){
+    await fs.promise.unlink(filename)
+    console.log("删除成功")
+}
+```
+
+#### 文件流
+
+##### 文件流的相关概念
+
+> [文件流的文档](https://nodejs.org/docs/latest/api/stream.html)
+
+> 文件流就是数据从一个地方流向另一个地方，一般是数据流向内存，cpu操作数据，操作后的数据从内存流出
+
+流是有方向的，在js中流分为如下几类：
+- 可读流(Readable)：数据从源头流向内存
+- 可写流(Writable)：数据从内存流向源头
+- 双工流(Duplex)：数据即可从源头流向内存又可从内存流向源头
+
+
+**为什么需要流？**
+- reason
+    1. 其他介质和内存的数据规模不一致(其实就是空间大小不一致)
+        ![alt text](image-7.png)
+    2. 其他介质俄内存的数据处理能力不一致
+        ![alt text](image-8.png)
+
+
+**什么是文件流？**
+
+> 文件流指的就是内存数据和磁盘文件数据之间的流动
+
+
+##### fs.createReadStream()
+
+- 参数
+    - path `<string> | <Buffer> | <URL>` 文件路径
+    - options 
+        - flags `<string>` 文件模式,默认是`r`
+        - encoding `<string>` 编码方式，默认是null
+        - fd `<integer> | <FileHandle>` 默认是null
+        - mode `<integer>` 文件权限，默认是0o666
+        - autoClose `<boolean>` 读完后自动关闭，默认是true
+        - emitClose `<boolean>` 默认是true
+        - start `<integer>` 起始字节
+        - end `<integer>` 结束字节，  默认是Infinity
+        - highWaterMark `<integer>` 每次读取的数量，默认是 64 * 1024，这个数值受编码的影响
+        - fs `<Object> | <null>` 默认是null
+        - signal `<AbortSignal> | <null>` 默认是null
+- 返回值 
+    - 返回文件可读流(ReadStream)
+
+
+> 含义： 创建一个文件可读流，用于读取文件内容
+
+
+```js
+const fs = require("fs")
+const path = require("path")
+
+const filename =  path.resolve(__dirname,"./myfiles/1.txt")
+
+const rs = fs.createReadStream(filename,{
+    encoding: "utf-8",
+    highWaterMark: 5
+})
+```
+
+##### 可读流的相关操作
+**ReadStream.on(事件名,处理函数)**
+
+> 对于ReadStream有事件如下所示
+
+- open 文件打开事件，文件被打开后除法
+
+- error 出现错误以后触发
+
+- close 文件被关闭触发，可以通过ReadStream.close()手动关闭或者文件读取完自动关闭
+
+- data  读取到一部分数据后触发，注册data事件后才真正开始读取，每次读取highWaterMark指定的数量，回调函数中会附带读取到的数据
+
+- end 全部数据读取完毕会触发
+
+
+**ReadStream.pause()和resume()**
+
+ReadStream.pause()是暂停读取的函数
+
+- ReadStream.on("pause",()=>{})会在暂停读取后触发
+
+ReadStream.resume()是恢复读取的函数
+
+- ReadStream.on("resume",()=>{})会在暂停读取后触发
+
+```js
+rs.on("open",() => {
+    console.log("文件被打开了")
+})
+
+rs.on("error",()=>{
+    console.log("出错了")
+})
+
+rs.on("close",()=>{
+    console.log("文件关闭了")
+})
+
+rs.on("data",chunk => {
+    console.log("读取到一部分数据:",chunk)
+    // 暂停读取
+    rs.pause()
+})
+
+rs.on("pause",()=>{
+    console.log("暂停了")
+    setTimeout(() => {
+        // 恢复读取
+        rs.resume()
+    },1000)
+})
+
+rs.on("resume",() => {
+    console.log("恢复读取")
+})
+
+rs.on("end",() => {
+    // 这个在close之前
+    console.log("全部数据读取完毕")
+})
+
+// 手动关闭文件流
+rs.close()
+```
+
+##### fs.createWriteStream()
+
+- 参数
+    - path `<string> | <Buffer> | <URL>` 文件路径
+    - options 
+        - flags `<string>` 文件模式,默认是`w`
+        - encoding `<string>` 编码方式，默认是utf8
+        - fd `<integer> | <FileHandle>` 默认是null
+        - mode `<integer>` 文件权限，默认是0o666
+        - autoClose `<boolean>` 写完后自动关闭，默认是true
+        - emitClose `<boolean>` 默认是true
+        - start `<integer>` 起始字节
+        - highWaterMark `<integer>` 每次写入的数量，默认是 16384，这里和读取不同是准确的字节数
+        - fs `<Object> | <null>` 默认是null
+        - signal `<AbortSignal> | <null>` 默认是null
+        - flush `<boolean>` 如果为真，则在关闭基础文件描述符之前刷新它,默认值是false
+- 返回值 
+    - 返回文件可写流(WriteStream)
+
+```js
+const fs = require("fs")
+const path = require("path")
+
+const filename =  path.resolve(__dirname,"./myfiles/1.txt")
+
+// 创建写入流
+
+const ws = fs.createWriteStream(filename,{
+    flags: "a" // 追加写入
+    encoding: "utf-8",
+    highWaterMark: 3
+})
+```
+
+##### 可写流的相关操作
+
+**WriteStream.on(事件名,处理函数)**
+
+- open  打开文件的时候触发
+- error 报错的时候触发
+- close 关闭文件的时候触发
+
+**WriteStream.write(data)**
+
+- 写入一组数据，data可以是字符串或者Buffer
+- 返回一个boolean值
+    - true：写入通道没有被填满，接下来的数据可以直接写入，无需排队
+        ![alt text](image-9.png)
+    - false：写入通道目前已被填满，接下来的数据将进入队列
+        ![alt text](image-10.png)
+        - 这里要注意背压问题，因为写入队列是内存中的数据，是有限的
+        - 背压问题的解决方式：
+            ```js
+            const fs = require("fs")
+            const path = require("path")
+
+            const filename =  path.resolve(__dirname,"./myfiles/1.txt")
+
+            // 创建写入流
+
+            const ws = fs.createWriteStream(filename,{
+                encoding: "utf-8",
+                highWaterMark: 16*1024
+            })
+
+
+            let i = 0
+            // 一致写，知道大奥上限，或无法再直接写入
+            function write(){
+                let flag = true
+                while(i<1024*1024*10 && flag){
+                    flag = ws.write("a")  // 写入a，得到下一次还能不能直接写
+                    i++
+                }
+            }
+
+            write()
+
+            // 等队列清空继续调用write去写入
+            ws.on("drain",()=>{
+                write()
+            })
+            ```
+- 当写入队列清空时，会触发drain事件
+
+**WriteStream.end([data])**
+
+- 结束写入，将自动关闭文件
+    - 自动关闭取决于autoClose配置，默认为true
+- data是可选的，表示关闭前的最后一次写入
+
+
+##### ReadStream.pipe(WriteStream)(文件流demo)
+
+> 复制文件
+
+```js
+const fs = require("fs")
+const path = require("path")
+
+// 方式1：把文件所有内存都放入到内存队列，内存占用高
+async function method1() {
+    const from = path.resolve(__dirname,"./myfiles/1.txt")
+    const to = path.resolve(__dirname,"./myfiles/2.txt")
+    console.time("方式1")
+    const content = await fs.promises.readFile(from)
+    await fs.promises.writeFile(to,content)
+    console.timeEnd("方式1")
+    console.log("复制完成")
+}
+
+// 方式2  不仅时间少了很多，占用内存空间也少了很多
+
+async function method2() {
+    const from = path.resolve(__dirname,"./myfiles/1.txt")
+    const to = path.resolve(__dirname,"./myfiles/3.txt")
+    console.time("方式2")
+    const rs = fs.createReadStream(from)
+    const ws = fs.createWriteStream(to)
+    rs.on("data", chunk=>{
+        // 都一部分数据
+        const flag = ws.write(chunk)
+        if(!flag){
+            // 表示下一次会造成背压
+            rs.pause() // 暂停读取
+        }
+    })
+
+    ws.on("drain",()=>{
+        // 表示可以继续写了
+        rs.resume()
+    })
+
+    rs.on("close",()=>{
+        // 写完了
+        ws.end() //关闭写入流
+        console.timeEnd("方式2")
+        console.log("复制完成")
+    }) 
+}
+
+method1()
+method2()
+```
+
+
+> 其实上面的方式2已经有封装好的函数了就是读取流的`ReadStream.pipe(WriteStream)`
+
+- 将可读流和可写流连接
+- 返回参数值
+- 该方法可以解决背压问题
+
+```js
+const fs = require("fs")
+const path = require("path")
+
+async function method3() {
+    const from = path.resolve(__dirname,"./myfiles/1.txt")
+    const to = path.resolve(__dirname,"./myfiles/4.txt")
+    console.time("方式3")
+    const rs = fs.createReadStream(from)
+    const ws = fs.createWriteStream(to)
+    
+    rs.pipe(ws)
+
+    rs.on("close",()=>{
+        console.timeEnd("方式3")
+    })
+}
+```
+
+![alt text](image-11.png)
