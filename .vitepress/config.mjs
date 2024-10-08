@@ -5,7 +5,7 @@ export default defineConfig({
   base: '/markdown/',
   title: "Mzmm知识库",
   description: "share knowledge",
-  head: [["link", { rel: "icon", href: "/logo.svg" }]],
+  head: [["link", { rel: "icon", href: "/favicon.png" }]],
   themeConfig: {
     outlineTitle: "文章目录",
     outline: "deep",  // 或者是[2,6]

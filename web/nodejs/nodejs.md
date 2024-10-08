@@ -1337,3 +1337,227 @@ async function method3() {
 ```
 
 ![alt text](image-11.png)
+
+### net模块
+
+> (net模块文档)[https://nodejs.org/docs/latest/api/net.html]
+
+#### http请求
+
+- 普通模式
+![alt text](image-12.png)
+- 长连接模式
+![alt text](image-13.png)
+
+
+#### net模块的作用
+
+- net是一个通信模块
+- 可以使用其实现进程间的通信IPC
+- 可以实现网络通信TCP/IP  🚩
+
+#### 创建客户端
+
+> 在nodejs中主动去发送请求
+
+##### net.createConnection(options[,connectListener])
+
+- 参数
+    - options `<obj>`
+        - host `<string>` 要连接到的主机
+        - port `<number>` 端口号
+        - 剩下的配置详见：[配置](https://nodejs.org/docs/latest/api/net.html#socketconnectoptions-connectlistener)
+    - connectListener `<Function>` 
+- 返回值
+    - 返回socket
+
+对于**socket**有如下解释
+- socket是一个特殊的文件
+- 在node中表现为一个双工流对象
+- 通过写入内容发送数据
+- 通过监听流的内容获取数据
+- socket.on("end",()=>{}) 关闭socket流会触发
+
+![alt text](image-14.png)
+
+```js
+const net = require("net")
+
+// 创建客户端
+const socket = net.createConnection(
+    {
+        host: "ke.qq.com",
+        port: 80
+    },
+    () => {
+        console.log("连接成功")
+    }
+)
+
+socket.write(`你好！`)
+
+socket.on("data",chunk => {
+    console.log("来自服务器的消息",chunk.toString("utf-8"))
+    // 客户端挂断TCP连接
+    socket.end()
+})
+```
+![alt text](image-15.png)
+
+```js
+socket.write(`GET / HTTP/1.1
+Host: tabox.mzmm403.top/
+Connection: keep-alive
+
+`)
+
+// 报文书写的方式
+`请求行
+请求头
+
+请求体`
+```
+
+**socket.end()因为流的队列问题会造成通道的拥堵，导致一次只能传固定长度的数据，因此可以通过Content-Length可以去判断当前流传输是否完成，具体代码如下**
+
+```js
+const net = require("net")
+
+// 创建客户端
+const socket = net.createConnection(
+    {
+        host: "ke.qq.com",
+        port: 80
+    },
+    () => {
+        console.log("连接成功")
+    }
+)
+
+//
+var receive = null
+
+// 获取http报文请求将其制作成一个对象
+function parseResponse(response) {
+    const index = response.indexOf("\r\n\r\n")
+    const head = response.sunbstring(0,index)
+    const body = response.substring(index + 2)
+    const headParts = head.split("\r\n")
+    const headerArray = headParts.slice(1).map(str => {
+        return str.split(":").map(s => s.trim())
+    })
+    const header = headerArray.reduce((a,b) => {
+        a[b[0]] = b[1]
+        return a
+    },{})
+
+    return {
+        header,
+        body: body.trimStart()
+    }
+}
+
+// 判断是否接收完成
+function isOver(){
+    // 需要接收的消息体的总字节数
+    const contentLength =+ receive.header["Content-Length"]
+    // 当前已经接收的总字节数
+    const curReceivedLength = Buffer.from(receive.body,"utf-8").byteLength
+    // 返回比较结果
+    return curReceivedLength > contentLength
+}
+
+socket.on("data",chunk => {
+    const response = chunk.toString("utf-8")
+    if(!receive){
+        // 第一次接收
+        parseResponse(response)
+        // 看当前是否已经传输完成
+        if (isOver()){
+            socket.end()
+        }
+        return
+    }
+
+    receive.body += response
+    if(isOver()){
+        socket.end()
+        return
+    }
+
+})
+
+
+socket.write(`GET / HTTP/1.1
+Host: tabox.mzmm403.top/
+Connection: keep-alive
+    
+`)
+```
+
+#### 创建服务端
+##### net.createServer()
+
+- 参数
+    - options `<obj>`
+        - 剩下的配置详见：[配置](https://nodejs.org/docs/latest/api/net.html#socketconnectoptions-connectlistener)
+    - connnectListener `<Function>` 回调函数
+- 返回值
+    - 返回server对象
+
+对于**server**对象有如下解释
+
+- server.listen(port)
+- server.on("listening",()=>{})
+- server.on("connection",socket=>{})
+
+![alt text](image-16.png)
+
+*建议在IE浏览器中尝试下面这段代码*
+```js
+const net = require("net")
+const fs = require("fs")
+const path = require("path")
+
+// 创建一个服务端
+const server = net.createServer()
+
+// 服务器监听9527端口
+server.listen(9527)
+
+// 服务器触发了监听以后就会触发事件
+server.on("listening",() => {
+    console.log("server listen 9527")
+})
+
+// 客户端和服务端建立连接了
+// 当某个连接到来时，触发该事件，事件监听函数会获得一个socket对象
+server.on("connection", socket => {
+    console.log("有客户端连接到服务器")
+
+    socket.on("data", async chunk => {
+        const filename = path.resolve(__dirname,"./myfiles/eh.jpg")
+        const bodyBuffer = await fs.promises.readFile(filename)
+        const headBuffer = Buffer.from(`HTTP/1.1 200 OK
+Content-Type: image/jpeg        
+        
+`,
+            "utf-8"
+        )
+        const result = Buffer.concat([headBuffer,bodyBuffer])
+        socket.write(result)
+        socket.end()
+    })
+
+    socket.on("end",()=>{
+        console.log("连接关闭")
+    })
+})
+```
+
+
+### http模块
+
+- http模块建立在net模块上
+- `http.request(url[,options][,callback])`
+- `http.createServer([options][,requestListener])`
