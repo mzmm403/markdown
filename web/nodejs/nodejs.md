@@ -1558,6 +1558,391 @@ Content-Type: image/jpeg
 
 ### http模块
 
+> [http的文档](https://nodejs.org/docs/latest/api/http.html#httprequesturl-options-callback)
+
 - http模块建立在net模块上
+    - 无需手动管理socket
+    - 无需手动组装消息格式
+
 - `http.request(url[,options][,callback])`
+    - nodejs作为客户端发送消息
 - `http.createServer([options][,requestListener])`
+    - 使用nodejs搭建服务器
+
+
+
+#### http.request()
+
+- 参数
+    - url `<string>` | `<URL>`
+    - options `<obj>`
+        - method `<string>` 表示请求的方法
+        - headers `<obj>` 包含请求标头的对象
+        - timeout `<number>` 超时的事件
+        - [剩余参数](https://nodejs.org/docs/latest/api/http.html#httprequesturl-options-callback)
+    - callback `<function>`
+- 返回值
+    - `<http.ClientRequest>` 返回一个客户端的请求对象
+
+
+> 这个方法的作用是创建一个客户端
+
+
+
+```js
+const http = require("http")
+
+// 创建一个客户端请求对象
+const request = http.request(
+    // url必填参数
+    "http://tabox.mzmm403.top/#/",
+    // 配置信息
+    {
+        method: "GET"
+    },
+    // 请求发送以后返回的respons的报文信息
+    respon => {
+        console.log("服务器的响应状态码是：" + respon.statusCode)
+        console.log("返回的响应报文的头",respon.headers)
+
+        // 获取服务器返回的信息，因为不知道多大，所以是按照流的形式一块一块读出来
+        let result = ""
+        // 获取每一块返回的信息，进行拼接
+        respon.on("data",chunk => {
+            result += chunk.toString("utf-8")
+        })
+
+        // 读取返回的流结束以后输出拼接的结果
+        respon.on("end",() => {
+            console.log(result)
+            console.log("结束")
+        })
+    }
+)
+
+// 在request请求的时候，如果是post这种请求是需要消息体的，
+// 因此上面的请求构建完以后会阻塞等待消息体的补全，也就是向流中写入要传递的信息
+request.write()
+
+// 这个代表了发送消息，如果是post就在上一步写入消息，
+// 如果没有就直接用end表示已经结束写入消息，发送出消息
+request.end()
+```
+
+
+#### http.createServer()
+
+- 参数
+    - options `<obj>`
+        - requestTimeout `<number>` 设置从客户端接收整个请求的超时值(以ms为单位)，默认值300000
+        - keepAliveTimeout `<number>` 在完成一个写入后，在套接字销毁之前，服务器需要额外等待传入数据的不活动毫秒数，默认值为5000
+        - [剩余参数](https://nodejs.org/docs/latest/api/http.html#httpcreateserveroptions-requestlistener)
+- 返回值
+    - `<http.Server>` 返回一个服务端对象
+
+```js
+const http = require("http")
+const url = require("url")
+
+const getReqInfo = (req) => {
+    console.log("有请求来了")
+    // 获取请求的路径
+    console.log("请求的路径：" + url.parse(req.url))
+    console.log("请求头：" + req.headers)
+    console.log("请求方法：" + req.method)
+
+    // 客户你请求的信息
+    let body = ""
+    req.on("data", chunk => {
+        body += chunk.toString("utf-8")
+    })
+
+    req.on("end", () => {
+        console.log("请求体", body)
+    })
+}
+
+const server = http.createServer((req, res) => {
+    getReqInfo(req)
+    // 设置返回报文的请求投
+    res.setHeader("a", "1")
+    // 设置状态码
+    res.stateCode = 404
+    // 写入返回报文的信息
+    res.write("你好!", "utf-8")
+    // 结束信息的书写
+    res.end()
+})
+
+
+server.listen(9527)
+
+
+server.on("listening", () => {
+    console.log("server listen 9527")
+})
+```
+
+
+
+#### 静态资源服务器demo
+
+```js
+// 静态资源服务器
+
+// http://localhost:9527/index.html -> pubilc/index.html 文件内容
+// http://localhost:9527/index.css -> pubilc/index.css 文件内容
+
+
+const http = require("http")
+const url = require("url")
+const path = require("path")
+const fs = require("fs")
+
+
+// 验证文件路径是否存在
+async function getSata(filename) {
+    try {
+        return await fs.promises.stat(filename)
+    } catch {
+        return null
+    }
+}
+
+
+// 根据url获取到文件信息
+const getFileInfo = async (fileurl) => {
+    const urlObj = url.parse(fileurl)
+    let filepath = path.resolve(__dirname, "public", urlObj.pathname.substr(1))
+    const stat = await getSata(filepath)
+    if (!stat) {
+        // 文件不存在的情况
+        return null
+    } else if (stat.isDirectory()) {
+        // 文件是一个目录的情况
+        filepath1 = path.resolve(__dirname, "public", urlObj.pathname.substr(1), "index.html")
+        const adstat = await getSata(filepath1)
+        if (!adstat) {
+            // 文件不存在
+            return null
+        } else {
+            // 文件存在
+            return await fs.promises.readFile(filepath1)
+        }
+    } else {
+        return await fs.promises.readFile(filepath)
+    }
+}
+
+// 服务器的逻辑处理函数
+const handler = async (req, res) => {
+    const info = await getFileInfo(req.url)
+    if (info) {
+        res.write(info)
+    } else {
+        res.statusCode = 404
+        res.write("访问资源不存在")
+    }
+    res.end()
+}
+
+// 创建服务器
+const server = http.createServer((req, res) => {
+    handler(req, res)
+})
+
+server.on("listening", () => {
+    console.log("server listen 6000")
+})
+
+server.listen(6000)
+```
+
+### https模块
+
+- 服务器结构
+
+![alt text](image-17.png)
+
+- 证书准备
+
+```bash
+# 生成CA私钥
+# genrsa: 密钥对生成算法
+# -des3 使用对称加密算法des3对私钥进一步加密
+# -out ca-pri-key.pem: 将加密后的私钥保存到当前目录的ca-pri-key.pem文件中
+# 1024: 私钥的字节数
+
+openssl genrsa -des3 -out ca-pri-key.pem 1024
+
+
+# 生成CA公钥
+#通过私钥文件ca-pri-key.pem中的内容，生成对应的公钥，保存到ca-pub-key.pem中
+#运行过程中要使用之前输入的密码来实现对私钥文件的解密
+openssl req -new -key ca-pri-key.pem -out ca-pub-key.pem
+
+# 生成ca根证书
+# 使用x.509证书标准，通过证书请求文件ca-pub-key.pem生成证书，并使用私钥ca-pri-key.pem加密，然后把证书保存到ca-cert.crt文件中
+openssl x509 -req -in ca-pub-key.pem -signkey ca-pri-key.pem -out ca-cert.crt
+
+
+# 生成服务器私钥
+openssl genrsa -out server-key.pem 1024
+# 生成服务器公钥
+openssl req -new -key server-key.pem -out server- scr.pem
+# 生成服务器的证书
+openssl x509 -req -CA ca-cert.crt -CAkey ca-pri-key.pem -CAcreateserial -in server-scr.pem -out server-cert.crt
+```
+
+- https模块
+
+```js
+const https = require("https")
+const fs = require("fs")
+const path = require("path")
+
+const server = https.createServer(
+    {
+        key: fs.readFileSync(path.resolve(__dirname,"./server-key.pem")), // 私钥
+        cert: fs.readFileSync(path.resolve(__dirname,"./server-cert.crt"))
+    },
+    (req,res) => {
+        // 具体的逻辑
+    } 
+)
+
+server.listen(443)
+
+server.on("listening",()=>{
+    console.log("server listen 443")
+})
+```
+
+### node生命周期
+
+![alt text](image-18.png)
+
+> 这里着重关注timers/poll/check三个阶段
+> 我们这里可以把每个阶段看作一个宏任务队列，清空队列就可以进入下一个阶段
+> 是c++的libvu实现的
+
+- timers(其实就是循环检查计时器事件到没到，到了直接调用回调函数)
+    - 存放计时器的回调函数，也就是setTimeout和setInterval的回调
+- poll
+    - 轮询队列
+    - 除了timers和checks，绝大部分回调都会放到该队列，比如文件读取或者用户请求
+    - 运作方式
+        - 如果poll中有回调，一次执行回调直倒清空队列
+        - 如果poll没有回调
+            - 等待其他队列中出现回调，结束该阶段，进入下一阶段
+            - 如果其他队列也没有回调，持续等待，知道出现回调为止
+- check(整个和timers不同，只要调用就直接把回调函数放到队列里面执行)
+    - 检查阶段
+    - 使用setImmediate的回调会直接进入整个队列
+
+
+> 微任务队列：nextTick/Promise
+> 优先级：nextTick > Promise
+> 每次在执行回调函数的时候都会清空微队列
+
+
+### EventEmitter(拓展)
+
+> nodejs事件管理的通用机制
+> 原理就是维护了一个队列(函数的数组)
+
+```js
+const {EventEmitter} = require("events")
+
+// 创建一个事件处理对象
+// 可以注册事件，可以触发事件
+
+const ee = new EventEmitter()
+
+ee.on("abc",()=>{
+    console.log("abc触发了事件1")
+})
+const fn2 = ()=>{
+    console.log("abc触发了事件2")
+}
+ee.on("abc",fn2)
+ee.on("abc",()=>{
+    console.log("abc触发了事件3")
+})
+// once只触发一次
+ee.once("abc",()=>{
+    console.log("abc触发了事件4,该事件只触发一次")
+})
+
+ee.on("bcd",(a,b)=>{
+    console.log("参数是",a,b)
+})
+
+// 触发名为abc的事件
+
+ee.emit("abc")
+// 移除事件
+ee.off("abc",fn2)
+ee.emit("abc")
+ee.emit("abc")
+ee.emit("abc")
+ee.emit("bcd",1,2)
+```
+
+
+## node的数据库(mysql)
+
+### 数据库的简介
+
+- 数据库的作用
+    - 持久的存储数据
+    - 备份和恢复数据
+    - 快速的存储数据
+    - 权限控制
+- 数据库的类型
+    - 关系型数据库
+        - 特点：表和表关联构成的数据结构
+        - 优点
+            1. 能表达复杂的数据关系
+            2. 强大的查询语言，能精确的查找到想要的数据
+        - 缺点
+            1. 读写性能差，由器是海量数据的读写
+            2. 数据结构死板
+        - 用途： 存储结构复杂的数据库,业务数据
+
+    - 非关系型数据库
+        - 特点： 存储的数据结构简单，例如：
+            - 文档型：相当于一篇文章
+            - 键值对：`key:value`
+        - 优点
+            1. 格式灵活
+            2. 海量数据读写效率高
+        - 缺点
+            1. 难以表示复杂的数据结构
+            2. 对于复杂查询效率不好
+        - 用途：存储数据简单的数据(访问记录和用户偏好等)
+    - 面向对象数据库
+- 相关术语
+    - DB：数据库
+    - DBA：数据库管理员
+    - DBMS：数据管理系统
+    - DBS： 数据库系统 (包含了DB/DBA/DBMS)
+
+### 数据库的安装和使用
+
+> [安装mysql8](https://dev.mysql.com/downloads/mysql/)
+> [navicat](https://www.navicat.com.cn/products) `pdd`
+
+- mysql相关的简单命令
+
+```bash
+# 登录数据库
+mysql -uroot -p
+# 产看当前的数据库字符编码
+# 可以在my,ini文件中修改字符编码
+show variables like 'character\_set\_%'
+# 重启服务
+service mysql restart
+# 查看当前拥有的数据库
+show databases
+```
