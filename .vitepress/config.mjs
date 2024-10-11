@@ -24,7 +24,7 @@ export default defineConfig({
           { text: 'threejs', link: 'web/thressjs/threejs' },
           { text: 'nodejs', link: 'web/nodejs/nodejs' },
           { text: 'nuxtjs', link: 'web/nuxtjs/nuxtjs' },
-          { text: 'vue-hiprint', link: 'web/vue-print/index' }
+          { text: 'vue-hiprint', link: 'web/vue-plugin-hiprint/index' }
         ]
       },
       {
