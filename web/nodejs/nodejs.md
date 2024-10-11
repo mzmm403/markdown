@@ -1890,7 +1890,7 @@ ee.emit("bcd",1,2)
 ```
 
 
-## node的数据库(mysql)
+## nodejs的数据库(mysql)
 
 ### 数据库的简介
 
@@ -1946,3 +1946,369 @@ service mysql restart
 # 查看当前拥有的数据库
 show databases
 ```
+
+### 数据库的设计
+
+#### SQL
+
+- 结构化查询语言,它属于是声明式语言
+- 大部分关系型数据库都支持SQL
+- 分支
+    - DDL
+        - 数据定义语言
+        - 操作数据库对象
+            - 库
+            - 表
+            - 视图
+            - 存储过程
+    - DML
+        - 数据操作语言
+        - 操作数据库中的记录(增删改查)
+    - DCL
+        - 数据控制语言
+        - 控制用户权限
+
+#### 管理库
+
+```bash
+# 创建数据库
+create database mydb
+# 查看数据库
+show databases
+# 切换数据库
+use mydb
+# 删除数据库
+drop database mydb
+```
+
+#### 管理表
+
+**创建表一般是对列进行创建，也就是创建字段**
+- 字段名
+- 字段类型(常见)
+    - bit：占1位，0或1，false或true
+    - int：占32位，整数
+    - decimal(M,N)：能精确计算的实数，M是总的数字位数，N是小数位数(例如3.14159,这时的M是6，N是5)
+    - char(n)：固定长度位n的字符
+    - varchar(n)：长度可变，最大长度位n的字符
+    - text：大量的字符串
+    - date：仅日期
+    - datetime：日期和时间
+    - time：仅时间
+- 是否是必填(not null不能为空)
+- 是否自增
+- 默认值
+
+
+```sql
+-- 创建表
+create table mydatabase.mytable(
+    -- auto_increment是自增,自增必须是主键
+    id int not null auto_increment,
+    primary key(id)
+    name varchar(20) not null,
+    birthday date not null,
+    sex bit not null default 1
+)
+-- 修改表 修改操作太多了，就不写了
+-- 删除表
+drop table mydatabase.mytable
+```
+
+#### 主键和外键
+
+- 主键
+    - 根据设计原则，每张表都应该有一个主键
+    - 主键必须满足的要求
+        - 唯一
+        - 不能更改
+        - 无业务含义
+    - 主键不一定是自增的数字，也可以是uuid(很长的一段字符串)
+- 外键
+    - 用于产生表关系的列
+    - 外键列会连接到另一张表(或自己)的主键
+    ```sql
+    -- 一个学生表和一个班级表
+    -- 学生表里面的外键叫classid，连接到班级表的主键id上
+    add foreign key(classid) references test.class(id)
+    ```
+
+#### 关系表
+- 一对一
+    - 一个A对应一个B,一个B对应一个A
+    - 例如：学生和学生证
+    - 把任意一张表的主键同时设置为外键
+- 一对多
+    - 一个A对应多个B,一个B对应一个A，A和B是一对多，B和A是多对一
+    - 例如：班级和学生
+    - 在多一端上设置外键，对应到另一张表的主键上
+- 多对多
+    - 一个A对应多个B，一个B对应多个A
+    - 例如：学生和课程
+    - 需要建立一张关系表，关系表至少包含两个外键，分别对应两张表
+
+#### 三大设计范式
+
+1. 要求数据库的每一列是不可分割 的原子数据项
+2. 非主键列必须依赖于主键列
+3. 非主键列必须直接依赖于主键列
+
+
+### 表记录的增删改查
+
+#### 增删改
+
+> DML 数据操作语言
+
+```sql
+-- 增加语句
+insert into student(name,age,sex,classid) values("张三",18,1,1);
+-- 如果想要使用默认值直接default(不写也是默认值)
+insert into student(name,age,sex,classid) values("张三",18,default,1);
+-- 一次插入多条数据
+insert into student(name,age,sex,classid) 
+values
+("张三",18,default,1)
+("李四",19,default,2);
+
+-- 修改语句
+update student set name="王五" where id=1;
+
+-- 删除语句
+delete from student where name="王五";
+```
+
+#### 单表基本查询
+
+- select：就是查询
+    - *：查询全部
+    - 别名：as，可以用as关键字去命名
+    - case：对某一列的数据进行进一步处理
+    - distinct：去重
+- from：从哪张表查询
+- where：查询条件
+    - `=` 相等
+    - in 在里面
+    - is 是否是
+    - is not 是否不是
+    - `> < >= <=` 比较运算
+    - between 在某个范围内
+    - like 模糊查询
+    - and 和
+    - or 或
+- order by：排序
+    - asc 升序
+    - desc 降序
+- limit：分页
+    - n,m 从第n条开始，取m条数据
+
+- 运行顺序
+    1. from
+    2. where
+    3. select
+    4. order by
+    5. limit
+
+
+
+```sql
+-- case和别名的用法
+select id, name as studentname case sex
+when 1 then "男" 
+when 0 then "女"
+else "未知"
+end
+from student;
+-- 或者
+select id, name as studentname case 
+when sex=1 then "男" 
+when sex=0 then "女"
+else "未知"
+end
+from student;
+
+-- distinct的用法,一般只查一列，对某列去重,也可以放到最前面对多列数值去重
+select distinct classId from student;
+
+-- where的用法
+select * from student where classId in (1,2);
+select * from student where localtion is null;
+select * from student where salary >= 100000 and salary <= 200000;
+select * from student where between 100000 and 200000;
+-- 模糊查询，%为任意字符
+select * from student where name like "李%";
+-- 下划线为一个字符
+select * from student where name like "李_";
+
+-- order by的用法
+-- 先按照salary降序排序，如果salary相同再按照sex升序排序
+select * from student order by salary desc sex asc;
+```
+
+#### 联表查询
+
+- 笛卡尔积
+    - 两张表的数量相乘
+    ```sql
+    -- 后面是两个表
+    select * from student,class;
+    -- 实际案例，足球比赛分为主客场
+    select t1.name as 主队,t2.name as 客队 from team t1,team t2;
+    ```
+
+- 左连接，左外连接，left join
+- 右连接，右外连接，right join
+    - 以其中一张表为基准连接另一张表，每次连接的时候判断条件是否满足
+    - 左连接如果找不到就显示左边的表一次，右连接如果找不到就显示右边的表一次
+    ```sql
+    -- 左连接
+    -- 这个执行顺序其实就是从左边表中取出数据和右边表进行匹配，满足条件的就显示，不满足条件的就不显示
+    select * from student left join class on student.classId = class.id;
+
+    -- 右连接
+    -- 这个执行顺序其实就是从右边表中取出数据和左边表进行匹配，满足条件的就显示，不满足条件的就不显示
+    select * from student right join class on student.classId = class.id;
+    ```
+
+- 内连接，inner join
+    - 和左右连接不同的是内连接只显示满足条件的
+    ```sql
+    -- 内连接
+    select * from student inner join class on student.classId = class.id;
+    ```
+
+#### 函数和分组
+
+##### 函数
+
+- 内置函数
+    - 数学
+        - `abs(x)` 绝对值
+        - `ceil(x)` 向上取整，返回大于x的最小整数
+        - `floor(x)` 向下取整，返回小于x的最大整数
+        - `mod(x,y)` 返回x/y的余数
+        - `PI()` 返回圆周率
+        - `rand()` 返回0-1之间的随机数
+        - `round(x,y)` 对x进行四舍五入，y是保留的小数位数
+        - `truncate(x,y)` 对x进行截取，y是保留的小数位数
+    - 聚合(不能和其他列一起使用)
+        - `avg(col)` 返回指定列的平均值
+        - `count(col)` 返回指定列种非null值得个数
+        - `max(col)` 返回指定列的最大值
+        - `min(col)` 返回指定列的最小值
+        - `sum(col)` 返回指定列的所有值得和
+    - 字符
+        - `concat(str1,str2,...strn)` 将str1,str2,...strn连接成一个字符串
+        - `concat_ws(separator,str1,str2,...strn)` 用separator作为分隔符将str1,str2,...strn连接成一个字符串
+        - `trim(str)` 去除字符串两端的所有空格
+        - `ltrim(str)` 从字符串str中切点开头的空格
+        - `rtrim(str)` 返回字符串str结尾的空格
+
+    - 日期
+        - `curdate()`或者`current_date` 返回当前日期
+        - `curtime()`或者`current_time` 返回当前时间
+        - `timestampdiff(part,date1,date2))` 返回date1和date2之间的差值，part是时间单位，date1和date2是日期,part可以写如下的单位
+            - microsecond
+            - second
+            - minute
+            - hour
+            - day
+            - week
+            - month
+            - quarter
+            - year
+- 自定义函数
+
+
+##### 分组
+
+mysql的运行顺序： from -> join...on... -> where -> group by -> select -> having -> order by -> limit(其中having和select在其他数据库中可能顺序不一样)
+
+
+```sql
+-- 分组
+-- 查询住在每个地址的学生人数
+-- 可以多个字段分组
+-- 选分组后筛选，筛选要用having
+select addr,sex count(id) as 学生人数 from student group by addr,sex having 学生人数>10;
+```
+
+### 视图
+
+> 本质上就是根据查询缓存的结果生成一张表
+
+
+```sql
+-- 创建视图
+-- 视图的名字是v_student
+-- 视图的内容是根据查询缓存的结果生成一张表
+-- 这样可以减少查询的次数，提高查询效率
+create view v_student as select id,name,addr from student;
+```
+
+## nodejs的数据驱动和ORM
+
+### mysql驱动程序
+
+- 驱动程序
+    - 驱动程序是连接内存和其他存储介质的桥梁
+    - mysql驱动程序是连接内存数据和mysql数据的桥梁
+    - mysql驱动程序通常使用
+        - mysql
+        - mysql2(mysql-native)
+
+- mysql2: [mysql2的使用](https://sidorares.github.io/node-mysql2/zh-CN/docs)
+
+
+- 简单的增删改查
+
+- 
+    ```js
+    // 导入模块
+    const mysql = require('mysql2');
+
+    // 创建一个数据库连接
+    const connection = mysql.createConnection({
+    host: 'localhost',
+    user: 'root',
+    password: '123456',
+    database: 'test',
+    });
+
+    // 简单查询
+    connection.query(
+    'SELECT * FROM `user` WHERE `id` = 1',
+    function (err, results, fields) {
+        console.log(results); // 结果集
+        console.log(fields); // 额外的元数据（如果有的话）
+    }
+    );
+
+    // 简单插入
+    connection.query(
+    'INSERT INTO `user` (`username`, `password`) VALUES (?,?)',
+
+    ['mzmm', 123456],
+    function (err, results) {
+        console.log(results);
+    }
+    );
+
+    // 简单的删除
+    connection.query(
+    'DELETE FROM `user` WHERE `username` = ?',
+    ['mzmm'],
+    function (err, results) {
+        console.log(results);
+    }
+    );
+
+    // 简单的更新
+    connection.query(
+    'UPDATE `user` SET `password` =? WHERE `username` =?',
+    [12345678,'test'],
+    function (err, results) {
+        console.log(results);
+    }
+    );
+    ```
