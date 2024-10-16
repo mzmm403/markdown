@@ -35,6 +35,12 @@ export default defineConfig({
           { text: 'k8s', link: '/operation/k8s/k8s' },
           { text: 'canokey', link: '/operation/canokey/canokey' }
         ]
+      },
+      {
+        text: '项目',
+        items: [
+          { text: 'EasyCollectiveUI', link: '/project/EasyCollectiveUI/index' },
+        ]
       }
     ],
 

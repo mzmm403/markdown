@@ -2250,65 +2250,238 @@ create view v_student as select id,name,addr from student;
 
 ### mysql驱动程序
 
-- 驱动程序
-    - 驱动程序是连接内存和其他存储介质的桥梁
-    - mysql驱动程序是连接内存数据和mysql数据的桥梁
-    - mysql驱动程序通常使用
-        - mysql
-        - mysql2(mysql-native)
+#### 驱动程序
+- 驱动程序是连接内存和其他存储介质的桥梁
+- mysql驱动程序是连接内存数据和mysql数据的桥梁
+- mysql驱动程序通常使用
+    - mysql
+    - mysql2(mysql-native)
 
 - mysql2: [mysql2的使用](https://sidorares.github.io/node-mysql2/zh-CN/docs)
 
 
-- 简单的增删改查
+#### 简单的增删改查
 
-- 
-    ```js
-    // 导入模块
-    const mysql = require('mysql2');
+- 回调函数的方式
+```js
+// 导入模块
+const mysql = require('mysql2');
 
-    // 创建一个数据库连接
-    const connection = mysql.createConnection({
+// 创建一个数据库连接
+const connection = mysql.createConnection({
+host: 'localhost',
+user: 'root',
+password: '123456',
+database: 'test',
+});
+
+// 简单查询
+connection.query(
+'SELECT * FROM `user` WHERE `id` = 1',
+function (err, results, fields) {
+    console.log(results); // 结果集
+    console.log(fields); // 额外的元数据（如果有的话）
+}
+);
+
+// 简单插入
+connection.query(
+'INSERT INTO `user` (`username`, `password`) VALUES (?,?)',
+
+['mzmm', 123456],
+function (err, results) {
+    console.log(results);
+}
+);
+
+// 简单的删除
+connection.query(
+'DELETE FROM `user` WHERE `username` = ?',
+['mzmm'],
+function (err, results) {
+    console.log(results);
+}
+);
+
+// 简单的更新
+connection.query(
+'UPDATE `user` SET `password` =? WHERE `username` = ?',
+[12345678,'test'],
+function (err, results) {
+    console.log(results);
+}
+);
+```
+
+- promise的方式
+
+```js
+const mysql = require('mysql2/promise')
+
+async function main() {
+
+// 创建数据库连接
+const connection = await mysql.createConnection({
     host: 'localhost',
     user: 'root',
     password: '123456',
+    database: 'test'
+})
+
+// 执行增删改查语句
+const [rows, fields] = await connection.query('SELECT * FROM user where username = ?', ['test'])
+
+// 输出结果
+console.log(rows)
+// 输出表结构
+console.log(fields)
+// 关闭数据库连接
+connection.end()
+}
+
+main()
+```
+
+- 但是这里得注意，如果直接写sql语句，容易出现sql注入的安全问题，因此我们要使用参数化查询，防止sql注入，而不是使用字符串拼接。
+
+
+```js
+const mysql = require('mysql2/promise')
+
+async function main(username) {
+
+    // 创建数据库连接
+    const connection = await mysql.createConnection({
+        host: 'localhost',
+        user: 'root',
+        password: '123456',
+        database: 'test'
+    })
+    // 或者可以这样写,也是推荐写法
+    const sql =  'SELECT * FROM user where username = ?'
+    const [rows,fields] = await connection.execute(sql, [username])
+    // 这里注意一下模糊有查询的写的
+    const sql = "SELECT * FROM user where username like concat('%',?,'%')"
+
+    // 输出结果
+    console.log(rows)
+    // 输出表结构
+    console.log(fields)
+    // 关闭数据库连接
+    connection.end()
+}
+```
+
+#### 连接池
+
+> 在使用上述连接过程中，如果用户访问过度且还不关闭连接`connection.end()`，就会造成大量的服务器资源的浪费，因此，我们推荐使用连接池，其实它相当于一个数组，规定了几个人可以来连接，如果连接池满了，那么就等待，直到连接池有空闲位置。同时连接池会自动管理连接，当连接池中的连接使用完毕后，会自动关闭连接，释放资源。
+
+```js
+// 导入mysql2
+const mysql = require('mysql2/promise')
+
+// 创建连接池
+const pool = mysql.createPool({
+    // 数据库地址
+    host: 'localhost',
+    // 数据库账号名
+    user: 'root',
+    password: '123456',
+    // 数据库名
     database: 'test',
-    });
+    // 如果连接池满了是否等待
+    waitForConnections: true,
+    // 连接池最大连接数
+    connectionLimit: 10,
+    // 连接池最大等待数,0表示不限制
+    queueLimit: 0
+})
+```
 
-    // 简单查询
-    connection.query(
-    'SELECT * FROM `user` WHERE `id` = 1',
-    function (err, results, fields) {
-        console.log(results); // 结果集
-        console.log(fields); // 额外的元数据（如果有的话）
-    }
-    );
 
-    // 简单插入
-    connection.query(
-    'INSERT INTO `user` (`username`, `password`) VALUES (?,?)',
 
-    ['mzmm', 123456],
-    function (err, results) {
-        console.log(results);
-    }
-    );
+### ORM框架
 
-    // 简单的删除
-    connection.query(
-    'DELETE FROM `user` WHERE `username` = ?',
-    ['mzmm'],
-    function (err, results) {
-        console.log(results);
-    }
-    );
+> 首先什么是orm，orm就是对象关系映射，通过orm可以自动吧程序中的对象和数据库关联，orm会隐藏具体数据库底层的细节，让开发者使用同样的数据操作接口，完成对不同数据库的操作
 
-    // 简单的更新
-    connection.query(
-    'UPDATE `user` SET `password` =? WHERE `username` =?',
-    [12345678,'test'],
-    function (err, results) {
-        console.log(results);
-    }
-    );
-    ```
+下面是orm原理图
+
+ORM提供的API接口无须使用sql语句，它会根据具体的调用方式，自动生成最合适的sq语句操作数据
+
+- orm的优势
+    - 开发者不需要关心数据库，仅需要关心对象
+    - 可以轻易的完成数据库的迁移
+    - 无需拼接复杂的语句即可完成精确的查询
+
+![alt text](image-19.png)
+
+[Sequelize原文档](https://sequelize.org/docs/v6/getting-started/)
+[Sequelize中文文档](https://www.sequelize.cn/core-concepts/assocs)
+
+#### 安装和入门
+
+##### 安装
+
+```bash
+# 安装orm框架本体
+npm install --save sequelize
+# 安装相应的数据库驱动
+# 选择以下之一:
+npm install --save pg pg-hstore 
+npm install --save mysql2
+npm install --save mariadb
+npm install --save sqlite3
+npm install --save tedious 
+npm install --save oracledb
+```
+
+##### 连接到数据库
+- 数据库的配置文件，dbConfig.json
+```json
+{
+    "databaseName": "myschooldb",
+    "username":"root",
+    "password":"123456",
+    "host":"localhost",
+    "dialect":"mysql"
+}
+```
+
+- 数据库建立连接池的文件,db.js
+```js
+// 首先导入sequelize
+const Sequelize = require('sequelize');
+
+// 新建一个sequelize实例
+// 通常习惯读取json配置文件读取
+const config = require('../config/dbConfig.json');
+// 新建一个sequelize实例
+const sequelize = new Sequelize(config.databaseName, config.username, config.password, {
+    host: config.host,
+    dialect: config.dialect
+})
+
+// 导出数据库连接池
+module.exports = sequelize;
+```
+
+- index.js文件
+```js
+// 用来测试连接
+const sequelize = require('./model/db');
+// 测试连接
+(async function () {
+  try {
+    await sequelize.authenticate();
+    console.log('Connection has been established successfully.');
+  } catch (error) {
+    console.error('Unable to connect to the database:', error);
+  }
+})()
+```
+
+#### 模型定义和同步
+
+
+
+
