@@ -1,5 +1,7 @@
 ## 环境搭建
 
+### 配置项
+
 ```shell
 # 初始化git
 git init
@@ -163,7 +165,7 @@ tsconfig.node.json
 
 postcss.config.cjs
 
-```cjs
+```js
 /* eslint-env node */
 module.exports = {
   plugins: [
@@ -212,3 +214,353 @@ dist-ssr
 *.sln
 *.sw?
 ```
+
+
+### 测试代码
+
+- 工具类(/package/util)
+
+```ts
+// 安装插件的工具函数封装(install.ts)
+
+// 引入 Vue 中的 App 和 Plugin 类型，用于定义插件和应用实例的类型
+import type { App,Plugin } from "vue"
+// 从 lodash-es 库中引入 each 函数，用于遍历数组或对象。
+import { each } from "lodash-es"
+
+// 定义一个单文件组件类型SFCWithInstall，交叉类型(vue 插件类型和泛型的混合)
+type SFCWithInstall<T> = T & Plugin
+
+/**
+ * 接受一个 Plugin 类型的数组 components，用于批量安装组件
+ * @param componets 
+ * @returns 
+ */
+// 定义一个导出函数 makeInstaller，接受一个 Plugin 类型的数组 components，用于批量安装组件。
+export function makeInstaller(componets: Plugin[]){
+    const installer = (app: App) => {
+        // 使用 each 函数遍历 components 数组，将每个组件使用 app.use 方法进行安装。
+        each(componets,(c) => app.use(c))
+    }
+    // 返回 installer 函数，作为插件。
+    return installer as Plugin
+}
+
+/**
+ * 接受一个泛型 T 的组件，用于给组件添加 install 方法，使其成为插件。
+ * @param component  
+ * @returns 
+ */
+// 定义一个导出函数 withInstall，接受一个泛型 T 的组件，用于给组件添加 install 方法，使其成为插件。
+export const withInstall = <T>(component: T) => {
+    // 给组件添加 install 方法，接受一个 App 类型的参数 app，用于将组件注册到应用实例中。
+    (component as SFCWithInstall<T>).install = (app: App) => {
+        // 获取组件的名称，并使用 app.component 方法将组件注册到应用实例中。
+        const name = (component as any).name
+        // 使用 app.component 方法将组件注册到应用实例中。
+        app.component(name,component as Plugin)
+    }
+    // 返回组件，作为带有 install 方法的插件。
+    return component as SFCWithInstall<T>
+}
+
+
+// 导出封装好的工具 index.ts
+export * from "./install"
+```
+
+
+- 测试组件(/packages/components)
+
+```vue
+<!-- /Button/Button.vue 测试的按钮组件 -->
+<template>
+    <button style="background: pink;">这是一个按钮</button>
+</template>
+<script setup lang="ts">
+defineOptions({
+    name:"EcButton"
+})
+</script>
+```
+
+```ts
+// /Button/index.ts 测试的按钮组件的入口文件
+
+// 导入组件和暗转组件的工具函数
+import Button from "./Button.vue"
+import { withInstall } from "@easy-collective-ui/utils"
+
+// 使用 withInstall 函数给组件添加 install 方法，使其成为插件。
+export const EcButton = withInstall(Button) 
+```
+
+
+```ts
+// index.ts
+// 导出封装好的插件按钮组件
+export * from './Button'
+```
+
+- 入口文件(packages/core)
+
+```ts
+// commponents.ts 导入所有组件
+import { EcButton } from "@easy-collective-ui/components";
+import type { Plugin } from "vue";
+
+// 定义一个数组，导出所有的插件组件到数组中默认导出
+export default [EcButton] as Plugin[];
+
+
+
+
+
+// index.ts 包入口文件
+// 导入安装组件工具函数
+import { makeInstaller } from "@easy-collective-ui/utils";
+// 从组件文件夹导入组件
+import commponents from "./commponents";
+// 导入主题样式
+import '@easy-collective-ui/theme/index.css';
+
+// 使用 makeInstaller 函数批量安装组件
+const installer = makeInstaller(commponents);
+
+// 导出组件和安装器 这里默认导出安装器是为了在其他项目中调用的时候可以直接使用
+export * from "@easy-collective-ui/components"
+export default installer;
+```
+- 主题样式(/packages/theme)
+
+```css
+/* index.css */
+/* 导入样式文件 */
+@import "./reset.css"
+
+
+/** reset.css */
+body {
+  font-family: var(--er-font-family);
+  font-weight: 400;
+  font-size: var(--er-font-size-base);
+  line-height: calc(var(--er-font-size-base) * 1.2);
+  color: var(--er-text-color-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: var(--er-color-primary);
+  text-decoration: none;
+
+  &:hover,
+  &:focus {
+    color: var(--er-color-primary-light-3);
+  }
+
+  &:active {
+    color: var(--er-color-primary-dark-2);
+  }
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--er-text-color-regular);
+  font-weight: inherit;
+
+  &:first-child {
+    margin-top: 0;
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+h1 {
+  font-size: calc(var(--er-font-size-base) + 6px);
+}
+
+h2 {
+  font-size: calc(var(--er-font-size-base) + 4px);
+}
+
+h3 {
+  font-size: calc(var(--er-font-size-base) + 2px);
+}
+
+h4,
+h5,
+h6,
+p {
+  font-size: inherit;
+}
+
+p {
+  line-height: 1.8;
+
+  &:first-child {
+    margin-top: 0;
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+sup,
+sub {
+  font-size: calc(var(--er-font-size-base) - 1px);
+}
+
+small {
+  font-size: calc(var(--er-font-size-base) - 2px);
+}
+
+hr {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  border: 0;
+  border-top: 1px solid var(--er-border-color-lighter);
+}
+```
+
+```json
+/** package.json */
+{
+  "name": "@easy-collective-ui/theme",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.css",  //修改这里把index.css作为入口文件
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
+```
+
+
+- 测试案例(/packages/play)
+
+```ts
+// main.ts 测试的vite项目的入口文件，这里注册我们写的组件看是否成功写对
+import { createApp } from 'vue'
+import './style.css'
+import App from './App.vue'
+import EasyCollectivUI from 'easy-collective-ui'
+
+
+createApp(App).use(EasyCollectivUI).mount('#app')
+```
+
+### 文档
+
+> 创建文档
+
+```shell
+# 到package/docs的目录中使用初始化命令
+cd /packages/docs
+npx vitepress init
+```
+
+[创建文档详情见文章：建站](https://mzmm403.github.io/markdown/tobuild/build.html)
+
+
+### 修改最外层的package.json
+
+```json
+{
+  "scripts": {
+    "dev": "pnpm --filter @toy-element/play dev",
+    "docs:dev": "pnpm --filter @toy-element/docs dev",
+    "docs:build": "pnpm --filter @toy-element/docs build",
+    "test": "echo 'hello world'"
+  }
+}
+```
+
+
+创建一个 `.github/workflows/test-and-deploy.yml` 文件，内容如下
+
+```yaml
+name: Test and deploy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    name: Run Lint and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+
+      - name: Install pnpm 
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: npm run test
+
+  build:
+    name: Build docs
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build docs
+        run: npm run docs:build
+
+      - name: Upload docs
+        uses: actions/upload-artifact@v3
+        with:
+          name: docs
+          path: ./packages/docs/.vitepress/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download docs
+        uses: actions/download-artifact@v3
+        with:
+          name: docs
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GH_TOKEN }}
+          publish_dir: .
+```
+
+上面的`secrets.GH_TOKEN`去github创建，然后放到仓库里的配装项中，下次在推送代码的时候会自动部署
