@@ -1337,3 +1337,187 @@ class User{
 }
 ```
 
+### 泛型
+
+> 泛型就是指负数于函数、类、接口、类型别名之上的类型
+
+#### 在函数中使用泛型
+
+> 在函数名之后写上```<泛型名称>```
+
+```ts
+function take<T>(arr: T[],n: number): T[]{
+    if(n>= arr.length){
+        return arr
+    }
+    const newArr: T[] = []
+    for(let i = 0; i < n; i++){
+        newArr.push(arr[i])
+    }
+    return newArr
+}
+
+console.log(take([1,2,3,4,5], 3))
+```
+
+这个T类型依附于这个函数，在调用函数的时候，ts会自动按照后面参数的类型推导判断T类型，同时内部的T类型都是知道是一个类型
+
+如果无法推导，且没有传入具体的类型,类似于这样(`res = take<string>()`)，默认为空对象
+
+
+#### 在类、接⼝、类型别名中使⽤泛型
+
+> 在名称之后写上```<泛型名称>```
+
+```ts
+// 类型别名使用泛型
+type callback<T> = (n:T,i:number) => boolean
+
+function filter<T>(arr: T[], callback: callback<T>): T[]{
+    const newArr: T[] = []
+    arr.forEach((n,i) => {
+        if(callback(n,i)){
+            newArr.push(n)
+        }
+    })
+    return newArr
+}
+
+const arr = [1,2,3,4,5,6]
+
+console.log(filter(arr,n => n%2 !== 0))
+
+// 接口使用泛型
+interface callback<T>{
+    (n:T,i:number): boolean
+}
+```
+
+#### 泛型约束
+
+> 使用关键字extends来约束泛型
+
+```ts
+interface hasName {
+    name: string;
+}
+
+// 这里会发现一个问题：就是如果不对泛型进行越是就会导致obj不一定有name这个属性，因此会报错
+// 这里我们采用继承的方式，让泛型继承hasName接口，这样obj就一定会有name这个属性
+/**
+ * 实现对对象的name属性进行拼接操作
+ * @param obj 
+ */
+function changName<T extends hasName> (obj:T): T{
+    obj.name += "xxx";
+    return obj
+}
+
+console.log(changName({name: "1111"}))
+```
+
+
+#### 多泛型
+
+> 在函数、类、接口、类型别名中可以定义多个泛型
+
+```ts
+/**
+ * 将两个数组进行合并
+ * @param arr1 
+ * @param arr2 
+ */
+function mixArr<T,K>(arr1:T[],arr2:K[]):(T|K)[]{
+    let resArr:(T|K)[] = [...arr1,...arr2]
+    return resArr 
+}
+
+let res = mixArr([1,2,3],["a","b","c"])
+console.log(res)
+```
+
+
+## ts进阶
+
+### 深入理解类和接口
+
+> 编程思想
+
+- 面向对象编程：Oriented Object(基于事物)，简称OO，是一种编程思想，它提出一切要以对象为切入点思考问题
+- 面向过程编程：Oriented Process(基于步骤流程)，简称OP，是一种编程思想，它提出一切要以功能流程为切入点思考问题
+- 函数式编程：Oriented Function(基于数学函数)，简称OF，是一种编程思想，它提出一切要以数学函数为切入点思考问题
+
+> eg: 拿坦克大战这个游戏为例子，面向对象会把坦克，墙壁，子弹定位为一个个的类，然后每个对象个体之间都可以复用这个类里面的某些特性；面向过程就是比如自己的坦克在按下w键的时候调用函数往前移动，按下j键发射子弹；函数式编程就是把坦克，子弹都看作是物体，俩个物体之前是怎么进行计算的，坦克的是如何移动也是计算的，到底是匀速还是加速度，加速度多少算出多长事件移动多少距离
+
+
+### 类的继承
+
+> 继承可以描述类与类之间的关系
+> 拿坦克大战来举例，一共有玩家坦克/敌方坦克这两种坦克，那么这两个坦克之间是由关系的：玩家坦克是坦克/地方坦克也是坦克(所有玩家坦克和地方坦克都继承于坦克)
+
+
+如果A继承B，则A自动拥有B中的所有成员
+
+
+> 成员的重写(overwrite)
+
+- 子类中覆盖父类的成员(子类不能覆盖父类成员的类型)
+
+- 无论属性还是方法，都能重写，但是要保持类型不变
+
+- 注意this关键字：在继承关系中，this的指向式动态的，根据具体的调用来确定this的指向
+
+- 类型匹配：鸭子辨型法(子类的对象始终可以赋值给父类)，这种想象叫做里氏替换原则
+
+- protected修饰符: 受保护的成员，只能在自身和子类中访问
+
+- super关键字：在子类的方法中可以用super关键字使用父类成员
+
+- 继承具有单根性(每个类只能由一个父类)和传递性(A式B的父类，B是C的父类，A就是C的父类)
+
+```ts
+export class Tank{
+    x:number = 0
+    y:number = 0
+    target:string = "1号"
+    protected a:string = "hello"
+
+    shoot(){
+        console.log("发射子弹到${target}")
+    }
+
+    sayGood(){
+        console.log("good")
+    }
+}
+
+export class PlayerTank extends Tank{
+    // 成员重写
+    x:number = 100
+    y:number = 100
+    target:string = "2号"
+    file:string
+    // 错误的写法
+    // x:string = "100"
+
+    // 方法重写
+    shoot(){
+        console.log("玩家发射子弹${target}")
+    }
+
+    printA(){
+        console.log(this.a)
+    }
+
+    test(){
+        super.sayGood()
+    }
+}
+
+// 里式替换原则
+const p:Tank = new PlayerTank()
+p.shoot()
+if(p instanceof PlayerTank){
+    p.file = "xxx"
+}
+```
