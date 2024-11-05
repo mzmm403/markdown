@@ -1521,3 +1521,237 @@ if(p instanceof PlayerTank){
     p.file = "xxx"
 }
 ```
+
+### 抽象类
+
+> 以中国象棋为例，为什么需要抽象类
+
+- 有时某个类只表示一个抽象的概念，主要用于提取子类共有的成员，而不能直接创建它的对象
+
+- 给类前面加上`abstract`,表示该类是一个抽影响类，不可以创建一个抽象类的对象
+
+- 抽象类中可能有些成员必须存在，但是不知道成员的值是什么，因此需要一种强约束，让继承该类的子类必须实现改成员。这需要把改成员变成抽象成员(抽象成员必须在抽象类中)
+
+- 抽象方法
+
+```ts
+// 创建一个抽象类
+abstract class Chess{
+    x:number = 0
+    y:number = 0
+
+    // 抽象属性(成员)
+    abstract readonly name:string
+    // 抽象方法
+    abstract move(targetX:number,targetY:number):boolean
+}
+
+class King extends Chess{
+    readonly name:string = "帅"
+    move(targetX:number,targetY:number):boolean{
+        this.x = targetX
+        this.y = targetY
+        console.log("帅移动成功")
+        return true
+    }
+}
+
+class Hores extends Chess{
+    readonly name:string
+    constructor(){
+        super()
+        this.name = "马"
+    }
+    move(targetX:number,targetY:number):boolean{
+        this.x = targetX
+        this.y = targetY
+        console.log("马移动成功")
+        return true
+    }
+}
+
+class Car extends Chess{
+    get name(){
+        return "车"
+    }
+    move(targetX:number,targetY:number):boolean{
+        this.x = targetX
+        this.y = targetY
+        console.log("车移动成功")
+        return true
+    }
+}
+
+const c = new Chess() // 报错，不能创建抽象类的实例
+```
+
+### 设计模式 - 模板模式
+
+> 设计模式：面对一些常见的功能常见，有一些固定的、经过多年实践的成熟方法，这些方法称为设计模式
+
+模板模式：有些方法，所有的子类实现流程完全一致，只是流程中的某个步骤的具体实现不一致，可以将该方法提取到父类，在父类中完成整个流程的实现，遇到实现不一致的方法时，将该方法做成抽象方法，让子类去实现
+
+下面还是拿象棋举例：
+> 这里我们写代码的时候发现一个问题：就是对于move这个方法的整个流程有重复的地方，只有各个棋子的移动规则不同，因此按照正常的逻辑我们可以将整个流程的每一步代码先实现，然后在子类实现move这个抽象方法的时候去调用父类当中写好的流程方法，但是这么做会有缺点：1.就是重复调用，本质上虽然少写了一些代码但是仍然有重复的地方。2.就是调用顺序没有一个强约束，调用顺序对应的是流程，顺序的不确定会导致流程的乱序
+
+> 这个时候我们可以通过模板模式去解决这个问题，我们发现move好像并不是完全不知道的一个抽象方法我们好像知道它怎么写只是里面的一些流程不一样，因此我们可以把这个不一样的函数提取出来让子类去实现，所有有了下面的代码
+
+```ts
+// 创建一个抽象类
+abstract class Chess{
+    x:number = 0
+    y:number = 0
+
+    // 抽象属性(成员)
+    abstract readonly name:string
+    // 抽象方法
+    move(targetX:number,targetY:number):boolean{
+        console.log("判断边界，看看棋子是否移动的举例超出棋盘")
+        console.log("判断棋子的落点是否有己方棋子")
+        console.log("判断棋子落点是否有对方棋子")
+        if(this.rule(targetX,targetY)){
+            this.x = targetX
+            this.y = targetY
+
+            console.log(`${this.name}移动成功`)
+            rteurn true
+        }
+        return false
+    }
+
+    // 每个棋子的移动规则不一样，因此交给子类去实现
+    protected abstract rule(targetX:number,targetY:number):boolean
+}
+
+class King extends Chess{
+    readonly name:string = "帅"
+    protected rule(targetX:number,targetY:number):boolean{
+        if("规则判断"){
+            return true
+        }
+        return false
+    }
+}
+
+class Hores extends Chess{
+    readonly name:string
+    constructor(){
+        super()
+        this.name = "马"
+    }
+    protected rule(targetX:number,targetY:number):boolean{
+        if("规则判断"){
+            return true
+        }
+        return false
+    }
+}
+
+class Car extends Chess{
+    get name(){
+        return "车"
+    }
+    protected rule(targetX:number,targetY:number):boolean{
+        if("规则判断"){
+            return true
+        }
+        return false
+    }
+}
+```
+
+**使用了模板设计模式以后我们发现子类完全只需要关注和自己相关的逻辑即可，这样和父类之间耦合度更低，代码更清晰**
+
+
+
+### 静态成员
+
+> 静态成员是指附着在类上的成员(属于某个构造函数的成员),使用static修饰的成员是静态成员
+
+- 成员
+    - 实例成员：对象成员，属于某个类实例化出来的对象
+    - 静态成员：非实例成员，属于某个类
+```ts
+class User {
+    constuctor(
+        public loginId: string,
+        public loginPwd: string
+    ){}
+
+    // 这里登录的方法是用户登录，而不是具体的某个用户登录，因此这里应该是一个静态方法
+    static login(loginId: string,loginPwd: string): User | undefined {
+        return undefined
+    }
+}
+
+const res = User.login("xxx","ddd")
+```
+
+
+> 静态方法中的this指向
+
+实例方法中的this指向的是实例的对象
+静态方法中的this指向的是类本身
+
+### 设计模式 - 单例模式
+
+单例模式：某些类的对象，在系统中最多只能有一个，为了避免开发者造成随意创建多个类对象的错误，可以使用单例模式进行强约束
+
+
+下面还是拿象棋举例
+
+> 在象棋中，棋盘可以是一个类，但是棋盘这个类只能实例化一个对象，因为一个对局中不能有多个棋盘
+
+```ts
+class Board{
+    width:number = 500
+    height:number = 700
+
+    init(){
+        console.log("初始化棋盘")
+    }
+
+    // 私有化构造函数
+    private constructor(){}
+
+    private static _border?:Board
+
+    static createBoard():Board{
+        if(this._border){
+            return this._border
+        }
+        this._border = new Board()
+        return this._border
+    }
+}
+
+const borad = Board.createBoard()
+// 当我们多次调用createBoard这个方法的时候，因为第一次创建的时候已经给私有静态成员_board赋值了，所以第二次调用的时候直接返回这个_board即可, 因此第二次创建的board和第一次创建的board是同一个对象
+
+
+// 还有一种写法,但是这种写法局限性很强，比如在实例化之前要做一些准备工作这种写法就不行，因此推荐第一种写法
+
+
+
+class Board{
+    width:number = 500
+    height:number = 700
+
+    init(){
+        console.log("初始化棋盘")
+    }
+
+    // 私有化构造函数
+    private constructor(){}
+
+    static readonly singleBoard?:Board = new Board()
+}
+
+const borad = Board.singleBoard
+```
+
+
+### 接口进阶
+
+> 接口用于约束类，对象，函数，是一个类型契约
+
