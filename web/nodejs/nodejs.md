@@ -2482,6 +2482,203 @@ const sequelize = require('./model/db');
 
 #### 模型定义和同步
 
+- 模型的定义
+
+```js
+const sequelize = require('../db');
+const { DataTypes } = require('sequelize') 
+
+// 创建一个模型对象
+const Admin = sequelize.define("Admin",{
+    // 主键自动递增
+    // 定义表的列名
+    loginId:{
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    loginPwd:{
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    name:{
+        type: DataTypes.STRING,
+        allowNull: false,
+    }
+},{
+        // freezeTableName: true,  // 默认false,如果是true代表模型名是什么表明就是什么否则加复数
+        // tableName: "admin"  // 直接手动定义表名
+        // createdAt: false, // 禁止添加createAt字段
+        // updatedAt: false, // 禁止添加updateAt字段
+        // createdAt: "chuangjianshijian"  // 将createAt字段改名为chuangjianshijian
+        paranoid: true //从此以后，该表的数据不会真正删除，而是增加一列deleteAt，记录删除时间
+    }
+)
+
+/** 
+ * 模型同步
+ * Admin.sync() 如果表不存在则创建表(如果存在则不执行操作)
+ * Admin.sync({force:true}) 如果表存在则删除表重新创建
+ * Admin.sync({alter:true}) 这将检查数据库中表的当前状态，然后在表中进行必要的更改以使其与模型匹配。
+ * */ 
+
+
+module.exports = Admin
+```
+
+- 模型的同步
+    - Moudle.sync() 如果表不存在则创建表(如果存在则不执行操作)
+    - Moudle.sync({force:true}) 如果表存在则删除表重新创建
+    - Moudle.sync({alter:true}) 这将检查数据库中表的当前状态，然后在表中进行必要的更改以使其与模型匹配。
+    - 单个模型的同步
+        - Moudle.sync()
+    - 多个模型的同步
+        ```js
+        // 用于同步所有模型
+
+        require('./Book')
+        require('./Class')
+        require('./Student')
+        require('./Admin')
+
+
+        const sequelize = require('./db')
+
+        sequelize.sync({ alert: true }).then(() => {
+            console.log('所有模型已同步')
+        })
+        ```
+
+- 模型之间的关系
+    - A.hasOne(B) 关联意味着A和B之间存在一对一的关系，外键在目标模型(B)中定义
+    - A.belongsTo(B) 关联意味着A和B之间存在一对一的关系，外键在源模型(A)中定义
+    - A.hasMany(B) 关联意味着A和B之间存在一对多的关系，外键在目标模型(B)中定义
+    - A.belongsToMany(B，{through: 'C'}) 关联意味着A和B之间存在多对多的关系，需要定义一个连接表C(注意C传递给through参数，在这种情况下，Sequelize会自动使用改名称生成模型。但是如果定义了模型也可以直接传递模型)
+
+
+#### 模型的增删改
+
+- 三层架构
+
+![alt text](image-20.png)
+
+- 校验
+
+> 对于一个完整的系统而言，最重要的验证一定是再服务器端的，一般有三层校验
+
+1. 客户端(浏览器、app、小程序)验证：只要还是针对用户体验的
+2. 服务器端逻辑验证(业务逻辑层的验证)：为了业务逻辑的完整性、安全性
+3. 数据库验证：为了数据的完整性
+
+
+- 增删改
+
+> 这里以Admin表为例进行的增删改操作
+
+
+```js
+/**
+ * 管理员初始化
+ * 判断数据库中是否有管理员，如果没有则添加一个
+ */
+
+/** 导入Admin模型 */
+const Admin = require("../models/Admin.js")
+
+/** 添加管理员 */
+exports.addAdmin = async function(adminObj){
+    // 应该判断adminObj的属性是否合理以及账号是否已经存在
+    const ins = await Admin.create(adminObj)
+    return ins.toJSON()
+}
+
+/** 删除管理员 */
+exports.deleteAdmin = async function(adminId){
+    // // 方式1
+    // // 1. 得到实例
+    // const ins = await Admin.findByPk(adminId)
+    // // 2. 删除
+    // if(ins){
+    //     await ins.destroy()
+    // }
+
+    // 方式2
+    // 直接删除
+    await Admin.destroy({
+        where: {
+            id: adminId
+        }
+    })
+}
+
+/** 修改管理员 */
+expors.updateAdmin = async function(adminId,adminObj){
+    // // 方式1
+    // // 1. 得到实例
+    // const ins = await Admin.findByPk(adminId)
+    // // 2. 修改
+    // ins.loginPwd = adminObj.loginPwd
+    // // 3. 保存
+    // ins.save()
+
+    // 方式2
+    // 直接修改
+    await Admin.update(adminObj,{
+        where: {
+            id: adminId
+        }
+    })
+}
+```
+
+### 模拟数据
+
+> 一般我们要进行测试的时候没有太多的数据测试，因此为了解决这个问题需要进行数据模拟
+> [mock.js的文档](http://mockjs.com/)
+> 下面是两个数据填充实例,关于学生和班级的
+
+```js
+// mockClass.js
+
+const Mock = require("mockjs")
+const Class = require("../model/Class")
+
+const res = Mock.mock({
+    // 生成一个长度为3到10的数组，数组中每个元素是一个对象
+    "datas|10": [{
+        // 班级的编号
+        "id|+1": 1,
+        // 班级的名称
+        name: "高三 @id 班",
+        // 开班日期
+        openDate:"@date",
+    }]
+}).datas
+
+Class.bulkCreate(res)
 
 
 
+// mockStudent.js
+const Mock = require("mockjs")
+const Student = require("../model/Student")
+
+const res = Mock.mock({
+    "datas|200": [{
+        // 生成随机的中文名字
+        name:"@cname",
+        // 生成随机的日期
+        birthday:"@date",
+        // 生成随机的性别
+        "sex|1-2": true,
+        // 生成随机的电话号码
+        mobile: /1\d{10}/,
+        // 生成地址
+        // address:"@city(true)"
+        "ClassId|1-10": 1
+    }]
+}).datas
+
+Student.bulkCreate(res)
+```
+
+**上面只是数据填充的一种示例写法，其他写法可以查阅文档**
