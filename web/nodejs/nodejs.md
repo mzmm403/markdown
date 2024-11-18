@@ -2630,7 +2630,159 @@ expors.updateAdmin = async function(adminId,adminObj){
 }
 ```
 
-### 模拟数据
+#### 数据查询
+
+- 查询单个数据(findOne)
+
+```js
+exports.login = async function(loginId,loginPwd){
+    const res = await Admin.findOne({
+        where: {
+            loginId,
+            loginPwd
+        }
+    })
+    if(res && res.loginId === loginId && res.loginPwd === loginPwd){
+        return res.toJSON()
+    }
+    return null
+}
+```
+
+- 按照主键查询单个数据(findByPk)
+```js
+exports.getAdminById = async function(id){
+    const res = await Admin.findByPk(id)
+    if(res){
+        return res.toJSON()
+    }
+    return null
+}
+```
+
+- 查询多个数据(findAll)
+```js
+// 直接查询表中所有数据
+exports.getAll = async function () {
+    const res = await Studnet.findAll()
+    return JSON.stringify(res)
+}
+
+// 一般分页查询业务
+// 这里包含了查询数量的逻辑
+exports.getAll = async function (page=1,limit=10) {
+    const res = await Studnet.findAll({
+        offset: (page-1)*limit,
+        limit: +limit,
+    })
+    const total = await Student.count()
+    const datas =  JSON.stringify(res)
+    return {
+        total,
+        datas: JSON.parse(datas)
+    }
+}
+
+// 上面的分页逻辑还可以这样写
+exports.getAll = async function (page=1,limit=10) {
+    const res = await Student.findAndCountAll({
+        offset: (page-1)*limit,
+        limit: +limit,
+    })
+    return {
+        total: res.count,
+        data: JSON.parse(JSON.stringify(res.rows))
+    }
+}
+
+// 也可以指定条件查询
+exports.getAndSexAll = async function (sex,name) {
+
+    const condition = {}
+    if(sex !== -1){
+        condition.sex = !!sex
+    }
+    if(name){
+        condition.name = name.trim()
+    }
+    const res = await Student.findAll({
+        where: condition
+    })
+    return JSON.stringify(res)
+}
+```
+- 查询数量(count)
+```js
+const total = await Student.count()
+```
+
+- 模糊查询,这里以模糊查询为例，调用Op操作符进行模糊查询
+
+```js
+const { Op } = require("sequelize")
+
+
+exports.getAndSexAll = async function (name) {
+
+    const condition = {}
+    if(name){
+        condition.name = {
+            [Op.like]: `%${name}%`
+        }
+    }
+    const res = await Student.findAll({
+        where: condition
+    })
+    return JSON.stringify(res)
+}
+```
+
+- 自定义字段查询
+
+```js
+exports.getAll = async function (page=1,limit=10) {
+    const res = await Studnet.findAll({
+        // 只想查id和name以及sex的字段
+        attributes: ["id","name","sex"],
+        offset: (page-1)*limit,
+        limit: +limit,
+    })
+    const total = await Student.count()
+    const datas =  JSON.stringify(res)
+    return {
+        total,
+        datas: JSON.parse(datas)
+    }
+}
+```
+- 包含关系(include)
+> 只要两张表有关系，就可以进行联表查询
+
+```js
+const Class = require("../model/Class")
+const Student = require("../model/Student")
+
+exports.getAll = async function (page=1,limit=10) {
+    const res = await Studnet.findAll({
+        // 只想查id和name以及sex的字段
+        attributes: ["id","name","sex"],
+        // 包含关系
+        include: [Class],
+        offset: (page-1)*limit,
+        limit: +limit,
+    })
+    const total = await Student.count()
+    const datas =  JSON.stringify(res)
+    return {
+        total,
+        datas: JSON.parse(datas)
+    }
+}
+```
+
+
+
+## 模拟数据
 
 > 一般我们要进行测试的时候没有太多的数据测试，因此为了解决这个问题需要进行数据模拟
 > [mock.js的文档](http://mockjs.com/)
@@ -2682,3 +2834,381 @@ Student.bulkCreate(res)
 ```
 
 **上面只是数据填充的一种示例写法，其他写法可以查阅文档**
+
+
+
+
+## 数据爬取(爬虫)
+
+> 在nodejs中可以使用axios或者cheerio(jquery的核心库)等第三方库进行数据爬取
+
+> axios进行请求的发送,[axios的文档](https://www.axios-http.cn/docs/intro)
+> cherrio进行数据的解析,[cheerio的文档](https://www.cheeriojs.cn/docs/basics/loading)
+
+
+- 爬取示例(豆瓣读书)
+
+```js
+/** 抓取豆瓣读书中的数据信息 */
+/** 安装axios和cheerio */
+
+const axios = require('axios').default;
+const cheerio = require('cheerio')
+const Book = require('../model/Book')
+
+/**
+ * 获取豆瓣读书首页的HTML
+ */
+async function getBookHTML() {
+    const res = await axios.get("https://book.douban.com/latest")
+    return res.data
+}
+
+/**
+ * 从豆瓣读书中得到一个完整的网页，并从网页中分析数据的基本信息，然后得到一个书籍的详情页链接数组
+ */
+async function getBookLinks(){
+    const html = await getBookHTML();
+    const $ = cheerio.load(html);
+    const linksEle = $(".chart-dashed-list li .media__img a")
+    const links = linksEle.map((i,ele) => {
+        const href = ele.attribs["href"]
+        return href
+    }).get()
+    return links
+}
+
+/** 
+ * 根据详情页地址获取该书籍的详细信息 
+ * @param {String} url 详情页地址
+ */
+async function getBookInfo(url) {
+    const res = await axios.get(url)
+    const $ = cheerio.load(res.data)
+    const name = $("h1").text().trim()
+    const imgurl = $("#mainpic .nbg img").attr("src")
+    const spans = $("#info span.pl")
+    const authSpan = spans.filter((i,ele) => {
+        return $(ele).text().includes("作者")
+    })
+    const author = authSpan.next("a").text()
+    const publishSpan = spans.filter((i,ele) => {
+        return $(ele).text().includes("出版年")
+    })
+    const publishDate = publishSpan[0].nextSibling.nodeValue.trim()
+    return {name,imgurl,author,publishDate}
+}
+
+/**
+ * 获取所有的书籍信息
+ */
+
+async function fetchAll() {
+    // 得到书籍的详情页地址
+    const links = await getBookLinks()
+    const promise = links.map(link => {
+        return getBookInfo(link)
+    })
+    return Promise.all(promise) 
+}
+
+/**
+ * 将爬取到的信息保存到数据库
+ */
+async function saveToDB(){
+    const books = await fetchAll()
+    await Book.bulkCreate(books)
+    console.log("保存成功")
+}
+
+saveToDB()
+```
+
+## MD5加密
+
+- md5是一种哈希算法
+- 可以将任何一个字符串，加密成一个固定长度的字符串
+- 是单向加密算法，不可逆的
+- 同样的源字符串，加密后得到的结果固定
+
+> 安装md5
+
+```shell
+npm i md5
+```
+
+- 示例
+```js
+const md5 = require("md5")
+console.log(md5("123456"))
+```
+
+
+## moment
+> monment就是客户端的一个时间处理库
+
+- 一些事件的概念
+    - utc和北京时间
+        - utc：世界协调时
+        - 以格林威治时间为标准
+        - utc事件和北京时间相差8小时
+    - 时间戳
+        - 某个utc时间到utc1970-1-1凌晨经过的毫秒数
+        - 时间戳表示的是utc时间的差异
+    - 对于服务器的影响
+        - 服务器可能会部署到世界的任何位置
+        - 服务器内部应该统一使用utc时间或时间戳，包括数据库
+    - 对于客户端的影响
+        - 客户端要给不同地区的用户友好的显示时间
+        - 客户端应该把时间戳或utc时间转换为本地时间显示
+    - 示例图
+    ![alt text](image-21.png)
+
+- [中文文档](https://momentjs.cn/)
+
+
+- 安装moment
+
+```bash
+npm i moment
+```
+
+
+- 获取moment对象
+```js
+
+const moment = require('moment');
+
+// 得到当前时间
+console.log(moment().toString()); 
+console.log(moment.utc().toString())
+
+
+// 得到当前的时间戳
+console.log(moment().valueOf()); 
+console.log(moment.utc().valueOf())
+
+
+// 使用日期格式转换
+const formats = ["YYYY-MM-DD HH:mm:ss","YYYY-M-D H:m:s","x"];
+console.log(moment.utc("1979-01-01 00:00:00",formats,true).toString())
+console.log(moment.utc("1979-1-1 0:0:0",formats,true).toString())
+console.log(moment.utc(0,formats,true).toString())
+```
+
+- 对moment对象进行操作
+
+```js
+// 显示(发生在客户端)
+const m = moment.utc("2024-01-24 16:38:59", formats, true);
+console.log(m.format("YYYY年MM月DD日 HH点mm分ss秒"));
+
+// 客户端输入本地时间
+const m2 = moment("2024-01-24 16:38:59", formats, true);
+// 转换成utc时间
+const toServer = m2.utc().format("YYYY-MM-DD HH:mm:ss");
+console.log(toServer);
+
+
+// 可以计算距今的时间
+const m3 = moment().utc("2020-01-24 10:38:59", formats, true);
+console.log(m3.local().fromNow())
+```
+
+- 设置地区语言
+```js
+const moment = require('moment');
+// 设置全局语言为中文
+moment.locale('zh-cn'); 
+```
+
+
+## 数据验证
+
+- 数据验证的时间点
+    - 前端：为了用户的体验
+    - 后端：保证业务的完整性
+    - 数据库(约束)：保证数据的完整性
+    - 路由：保证数据的合法性(验证接口格式是否正常)
+
+- 相关库
+    - validator: 验证某个字符串是否满足某种规则
+    - [validator的文档](https://github.com/validatorjs/validator.js)
+    - vaildate.js: 验证某个对象是否满足某种规则
+    - [validate.js的文档](https://validatejs.org/)
+
+
+- 安装valdiate.js(这里验证就以validate.js为例)
+
+```bash
+npm i validate.js
+```
+
+- 关于验证的示例(学生的添加)
+
+
+> 下面的代码是添加学生的逻辑以及设置规则并使用规则以及如何自定义规则
+
+```js
+const Studnet = require('../model/Student')
+const Class = require("../model/Class")
+const validate = require('validate.js')
+const moment = require('moment')
+
+exports.addStudent = async function (stuObj) {
+    // 自定义验证规则
+    validate.validators.classExits = async function (value) {
+        const c = Class.findByPk(value)
+        if(c){
+            return
+        }
+        // 它会根据校验的字段自动填充报错信息例如：Class id is not exist
+        return "is not exist"
+    }
+
+    // 验证规则
+    const rule = {
+        name:{
+            // 判断name是否存在
+            presence: {
+                // 是否允许为空
+                allowEmpty: false
+            },
+            // 字段类型
+            type: "string",
+            // 字段的长度
+            length:{
+                minimum: 1,
+                maximum: 10
+            }
+        },
+        birthday:{
+            // 判断name是否存在
+            presence: {
+                // 是否允许为空
+                allowEmpty: false
+            },
+            datetime:{
+                // 只需要日期
+                dateOnly: true,
+                // 时间最早不要早于
+                earliest: moment.utc().subtract(100,"y").valueOf(),
+                // 时间最晚不要晚于
+                latest: moment.utc().subtract(5,"y").valueOf()
+            }
+        },
+        sex: {
+            // 判断name是否存在
+            presence: {
+                // 是否允许为空
+                allowEmpty: false
+            },
+            type: "boolean"
+        },
+        mobile: {
+            presence: {
+                // 是否允许为空
+                allowEmpty: false
+            },
+            format: /1\d{10}/
+        },
+        ClassId:{
+            presence: {
+                // 是否允许为空
+                allowEmpty: false
+            },
+            // type: "integer" // 严格验证类型必须是数字
+            numericality: {
+                onlyInteger: true,
+                strict: false,   // 关闭严格模式
+            },
+            // 打开自定义的校验规则
+            classExits: true
+        },
+        
+    }
+
+    // 验证通过res是undefined，验证失败res是错误信息
+    // 因为自定义的规则是异步的因此不能使用validate.validate进行验证
+    // validate.validate是同步的
+    // 所以要使用validate.async
+    await validate.async(stuObj,rule)
+    const ins = await Student.create(stuObj)
+    return ins.toJSON()
+}
+```
+
+> 下面的代码是对某个规则字段(验证器)进行拓展,就比如datetime中知道了时间，由于格式等问题无法直接进行比较，因此需要先将接收的值变为时间戳也就有了下面的拓展
+> 一般这个封装在services层的init.js中，要使其生效就必须在添加学生逻辑代码也就是业务代码之前引入init.js
+
+```js
+// 对于datetime验证器进行扩展
+
+const validate = require('validate.js');
+const moment = require("moment")
+
+validate.extend(validate.validators.datetime, {
+    /**
+     * 该函数自动用于日期的格式转换
+     * 它会在验证时自动触发，它需要将任何数据转换成时间戳返回
+     * 如果无法转换就返回NaN
+     * @param {*} value  传入的值
+     * @param {*} options  针对校验器的某个属性的验证配置
+     */
+    parse(value, options) {
+        let formats = ['YYYY-MM-DD HH:mm:ss',"YYYY-M-D H:m:s","x"]
+        if(options.dateOnly){
+            formats = ['YYYY-MM-DD',"YYYY-M-D","x"]
+        }
+        return moment.utc(value, formats,true).valueOf()
+    },
+    /**
+     * 用户显示错误信息时使用的显示字符串
+     * @param {*} value 
+     * @param {*} options 
+     */
+    format(value, options){
+        let format = "YYYY-MM-DD"
+        if(!options.dateOnly){
+            format += " HH:mm:ss"
+        }
+        return moment.utc(value).format(format)
+    }
+})
+```
+- 注意上面的只是做验证并不处理数据，因此当我们的对象出现不在校验内的数据时就无法覆盖验证，因此得在验证之前处理数据
+
+> 下面代码是一个util的工具类函数，用于选择对象里面我们需要哪些属性
+
+```js
+exports.pick = function(obj, ...props){
+    if(!obj || typeof obj !== "object"){
+        return obj
+    }
+    const newObj = {}
+    for (const key in obj){
+        if(props.includes(key)){
+            newObj[key] = obj[key]
+        }
+    }
+    return newObj
+}
+```
+> 我么可以在编写验证规则之前就使用工具类对对象进行一个数据规范，这样验证就能做到覆盖率100%
+
+```js
+const Studnet = require('../model/Student')
+const Class = require("../model/Class")
+const validate = require('validate.js')
+const moment = require('moment')
+const { pick } = require('../util/propertyHelpr')
+
+exports.addStudent = async function (stuObj) {
+    // 对数据进行处理，规定对象需要传哪些值
+    stuObj = pick(stuObj, "name","birthday","sex","mobile","ClassId")
+
+    // 自定义验证规则
+    // 验证规则
+    // ...
+}
+```
