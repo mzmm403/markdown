@@ -2780,6 +2780,64 @@ exports.getAll = async function (page=1,limit=10) {
 }
 ```
 
+#### 访问器和虚拟字段
+
+- 访问器
+> 访问其就是某个模型的属性对外提供的访问方式
+> 在不改变原有的数据结构的情况下，通过访问器的方式对外提供新的属性
+
+```js
+// 这里以学生的生日字段为例
+module.exports = sequlize.define("student",{
+    //...
+    birthday: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        // 访问器
+        get(){
+            return this.getDataValue("birthday").getTime()
+        }
+        // 还有set访问器是用来进行数据更改的(但是只针对示例化以后的对象的属性进行使用)
+    }
+
+    //....
+})
+```
+
+
+- 虚拟字段
+
+> 以学生模型为例添加虚拟字段
+
+```js
+const moment = require("moment")
+
+module.exports = sequlize.define("student",{
+    //...
+    birthday: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        // 访问器
+        get(){
+            return this.getDataValue("birthday").getTime()
+        }
+        // 还有set访问器是用来进行数据更改的(但是只针对示例化以后的对象的属性进行使用)
+    },
+    age: {
+        // 虚拟字段类型
+        type: DataTypes.VIRTUAL,
+        get() {
+            const now = moment.utc()
+            const birth = moment.utc(this.birthday)
+            return now.diff(birth, "y") // 去尾数取整
+        }
+    }
+
+    //....
+})
+```
+
+
 
 
 ## 模拟数据
@@ -2947,7 +3005,7 @@ console.log(md5("123456"))
 ## moment
 > monment就是客户端的一个时间处理库
 
-- 一些事件的概念
+- 一些时间的概念
     - utc和北京时间
         - utc：世界协调时
         - 以格林威治时间为标准
@@ -3210,5 +3268,235 @@ exports.addStudent = async function (stuObj) {
     // 自定义验证规则
     // 验证规则
     // ...
+}
+```
+
+
+## 日志记录
+
+> log4js是node.js中一个日志记录的库，它可以将日志记录到文件中，也可以将日志输出到控制台
+> [log4js的官方文档](https://log4js-node.github.io/log4js-node)
+
+- 一些概念
+    - level(日志级别)
+        - 例如调试日志、信息日志、错误日志等
+        - ![alt text](image-22.png)
+    - category(日志分类)
+        - 例如sql日志、请求日志等
+    - appender(日志出口)
+        - 应该把日志写到哪里
+        - 日志书写格式是什么(layouts)
+
+- 安装
+
+```bash
+npm i log4js
+```
+
+- 基本的一个使用
+```js
+const log4js = require('log4js');
+/**
+ * getLogger是log4js的默认方法，用于获取一个logger实例
+ * getLogger的入参是日志的类型，如果不写默认为default
+ */
+const logger = log4js.getLogger()
+/**
+ * 设定当前的日志级别
+ */
+logger.level = 'all'
+/**
+ * 获取到的logger示例后面调用的方法就是日志的级别
+ * 它会输出高于或者等于这个级别的日志信息
+ * 标准输出：[2024-11-20T13:17:39.701] [INFO] default - abc(时间/日志级别/日志类型/日志内容)
+ */
+logger.info("abc")
+```
+
+- 一般在平时使用的时候都会写一个配置,在其他文件导入使用
+
+```js
+const log4js = require('log4js');
+
+const path = require('path')
+log4js.configure({
+    appenders:{
+        sql:{
+            // 定义一个sql日志的出口
+            // dateFile这种类型和file不同在于如果文件大小满了自动备份会带上日期
+            type: "dateFile",
+            filename: path.resolve(__dirname,'logs',"sql","logging.log"),
+            // 设置日志的输出格式
+            layout:{
+                // 格式类型为pattern，即自定义的格式
+                // %d是日期，%p是日志级别，%m是日志内容，%n是换行，%c是日志的类型
+                type: "pattern",
+                pattern: "[%c]-[%d{yyyy-MM-dd hh:mm:ss}]-[%p]: %m%n"
+            },
+            // 配置文件的最大字节数 5M
+            maxLogSize: 1024 * 1024 * 5,
+            // 保持日志备份的后缀名为。log
+            keepFileExt: true,
+            // 保留几天内的日志文件
+            daysToKeep: 7
+        },
+        // 默认出口必须设置，否则会报错
+        default:{   
+            // 标准的控制台输出
+            type: "stdout"
+        }
+    },
+    categories:{
+        sql: {
+            // 该分类使用出口sql的配置写入日志
+            appenders: ['sql'],
+            // 该分类的日志级别
+            level: "all"
+        },
+        // 默认出口必须设置，否则会报错
+        default: {
+            appenders: ['default'],
+            level: "all"
+        }
+    }
+})
+
+process.on("exit", ()=>{
+    log4js.shutdown();
+})
+
+const sqlLogger = log4js.getLogger("sql");
+const defaultLogger = log4js.getLogger();
+
+exports.sqlLogger = sqlLogger;
+exports.logger = defaultLogger;
+```
+
+- 以数据库为例导入使用
+
+```js
+// 首先导入sequelize
+const Sequelize = require('sequelize');
+const { sqlLogger } = require('../logger');
+
+// 新建一个sequelize实例
+// 通常习惯读取json配置文件读取
+const config = require('../config/dbConfig.json');
+// 新建一个sequelize实例
+const sequelize = new Sequelize(config.databaseName, config.username, config.password, {
+    host: config.host,
+    dialect: config.dialect,
+    logging: (msg) => {
+        sqlLogger.debug(msg);
+    }
+})
+
+// 导出数据库连接池
+module.exports = sequelize;
+```
+
+
+
+## express-nodejs的web框架
+
+> [express的中文文档](https://www.expressjs.com.cn/)
+> [express的官方文档](https://expressjs.com/)
+
+### 基本使用
+
+- 安装
+
+```bash
+npm i express
+```
+
+
+- 使用
+
+```js
+const express = require('express');
+
+// 创建一个express实例
+// app实际上是一个函数，用于处理请求的函数
+const app = express(); 
+
+// 配置一个请求映射，如果请求方法和请求路径均满足匹配，交给处理函数进行处理
+// app.请求方法('请求路径',处理函数)
+app.get('/ping',(req,res) => {
+    // req和res是被express封装过的请求和响应对象
+    // 获取请求头
+    console.log("请求头",req.headers);
+    // 获取请求路径
+    console.log("请求路径",req.path);
+    // 获取请求参数
+    console.log("请求参数",req.query);
+
+    // 响应数据，send方法可以发送响应数据
+    res.send('pong');
+    // 手动设置响应头
+    res.setHeader('a','110');
+    // 手动设置响应状态码
+    res.status(201);
+    // 设置重定向
+    res.status(302).header('location','https://www.baidu.com').end();
+    // 简写
+    res.status(302).location('https://www.baidu.com').end();
+    // 还能简写,第一个参数不写就是301
+    res.redirect(302,'https://www.baidu.com');
+})
+
+// 设置动态路由
+app.get('/:id',(req,res) => {
+    console.log("动态路由",req.params);
+    res.send('ok');
+})
+
+// 匹配任何get请求
+app.get("*",(req,res) => {})
+
+// 设置端口号
+const port = 8080;
+app.listen(port,() => {
+    console.log(`Server running at http://127.0.0.1:${port}`);
+})
+```
+
+### express的中间件
+
+- 中间件的示意图
+![alt text](image-23.png)
+
+
+## nodemon
+
+> nodemon是一个监视器，用于监控工程中的文件变化，如果发现文件变化，可以执行一段脚本
+
+- 安装
+
+```bash
+# 安装开发依赖
+npm i -D nodemon 
+```
+
+**由于每次更改了express代码以后不能同步更新，因此使用nodemon进行配置监听**
+
+```json
+"scripts":{
+    "start": "nodemon -x npm run dev",
+    "dec": "node index"
+}
+```
+配置完以后由于是全局监听，因此需要配置忽略监听的文件
+nodemon.json
+```json
+{   
+    // 配置环境变量的
+    "env": {
+        "NODE_ENV": "development"
+    },
+    // 监听哪些文件变化
+    "watch": ["*.js","*.json"],
+    // 忽略哪些文件变化
+    "ignore": ["package*.json","node_modules","nodemon.json","public"]
 }
 ```
