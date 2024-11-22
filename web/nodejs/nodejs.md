@@ -3462,9 +3462,212 @@ app.listen(port,() => {
 ```
 
 ### express的中间件
+> 其实中间件就是处理请求的函数，它接收req和res对象，并且可以决定是否继续传递请求
+
+
 
 - 中间件的示意图
 ![alt text](image-23.png)
+
+- 封装的处理错误的中间件
+
+```js
+// 处理错误的中间件
+
+module.exports = function(err, req, res, next) {
+    if(err) {
+    // 发生了错误
+        res.status(500).sen({
+            code: 500,
+            msg: err,
+        })
+    }else{
+        next()
+    }
+};
+
+```
+- 使用中间件
+
+```js
+app.get('/ping', (req, res, next) => {
+        if(flag){
+            res.send('pong');
+        }else{
+            next(new Error(err))
+        }
+    },
+)
+
+// 如果第一个参数"/ping"不写，那么就可以匹配任何get请求
+// “/ping” 能匹配 “/ping/123”,"/ping/123/abc"等
+// 不能匹配 “/ping123”，"/pin"等
+app.use("/ping",require('./errorHandler'))
+```
+
+### express常用的中间件
+
+- express.static()  
+> 用于设置静态资源目录，例如图片、css、js等
+> 使用打包工具将vue/react项目打包会有静态资源，把这些静态资源放到服务器的public目录下，配置好中间件，用户访问的时候就是直接访问静态资源
+
+
+```js
+const path = require('path');
+const express = require('express');
+
+const app = express();
+const staticPath = path.resolve(__dirname, 'public');
+
+/**
+ * express.static() 入参是静态资源目录的路径
+ * expreess.static() 返回一个中间件函数，用于处理静态资源请求
+ * 当请求时，会根据请求的路径，从指定的目录中寻找是否存在该文件，
+ * 如果存在直接响应文件内容，而不再移交给猴戏的中间件
+ * 如果不存在文件，则移交给后续的中间件处理
+ * 默认情况下，如果映射的结果是一个目录，则会自动使用index.html文件
+ * 这个index可以配置，使用express.static()的第二个参数配置
+ */
+app.use("/static",express.static(staticPath, {
+    // 这样配置如果访问的是/，则会自动响应xxx.html文件
+    index: 'xxx.html'
+}))
+```
+
+
+- express.json()
+> 用于解析请求体，例如post请求的body,用来解析application/json格式的
+
+```js
+/**
+ *  解析后的数据会以对象的形式保存在req.body中
+ */
+app.use(
+    express.json()
+)
+```
+
+- express.urlencoded()
+> 用于解析请求体，例如post请求的body,用来解析application/x-www-form-urlencoded格式的
+
+```js
+/**
+ *  解析后的数据会以对象的形式保存在req.body中
+ */
+app.use(
+    express.urlencoded({
+        //用qs的库解析body 
+        executed: true,
+        // type默认是application/x-www-form-urlencoded
+        tyep: "application/x-www-form-urlencoded"
+    }))
+```
+
+### express路由
+
+> 其实这个路由就是一个中间件
+
+- 因为express对于async的支持不太好，导致异步的时候如果报错了要手动或抛出错误用next让下一个中间件捕获因此需要一个包装函数
+
+```js
+exports.asyncHandler  =  (handler) => {
+    return async (req, res, next) => {
+        try {
+            const result = await handler(req, res, next)
+            res.sned(exports.getSuccess(result))
+        }catch(err){
+            next(err)
+        }
+    }
+}
+```
+
+- 路由的定义以及对应路由的业务逻辑处理
+```js
+const express = require('express');
+const stuServ = require('../services/studentService');
+const { asyncHandler } = require('../middleware/getSendResult')
+
+
+// 创建路由实例
+const studentRouter = express.Router();
+// 获取学生
+// get -> get /api/student
+studentRouter.get(
+    '/list', 
+    asyncHandler(
+        async (req, res) => {
+            const page = req.query.page || 1;
+            const limit = req.query.limit || 10;
+            return await stuServ.getAll(page,limit)
+        }
+    )
+)
+// 创建学生
+// post -> post /api/student
+studentRouter.post(
+    '/', 
+    asyncHandler(
+        async (req, res) => {
+            return await stuServ.addStudent(req.body);
+        }
+    )
+)
+// 获取学生
+// get -> get /api/student/xxx
+studentRouter.get('/:id', (req, res) => {
+    console.log('获取学生');
+})
+// 删除学生
+// delete -> delete /api/student/xxx
+studentRouter.delete('/:id', (req, res) => {
+    console.log('删除学生');
+})
+// 修改学生
+// put -> put /api/student/xxx
+studentRouter.put('/:id', (req, res) => {
+    console.log('修改学生');
+})
+
+module.exports = studentRouter;
+```
+
+- 使用定义好的路由
+- init.js
+```js
+const studentRouter = require("./studetn")
+// 使用路由对“”/api/student”的请求进行拦截
+app.use("/api/student", studentRouter)
+// 错误处理的中间件,捕获所有页面的错误
+app.use(errorHandler)
+```
+
+
+- 对于消息的统一返回封装
+
+```js
+// 错误返回封装
+exports.getErr = function (err = "server internal error", errCode = 500) {
+    return {
+        code: errCode,
+        msg: err,
+    }
+}
+
+/**
+ * 统一成功返回封装
+ * @param {*} result 
+ * @param {*} msg 
+ * @returns 
+ */
+exports.getSuccess = function (result,msg) {
+    return {
+        code: 0,
+        msg: msg || "success",
+        data: result,
+    }
+}
+```
 
 
 ## nodemon
@@ -3500,3 +3703,5 @@ nodemon.json
     "ignore": ["package*.json","node_modules","nodemon.json","public"]
 }
 ```
+
+
