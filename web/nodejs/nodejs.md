@@ -4008,7 +4008,7 @@ exports.decrypt = function(signed) {
 - 首先运行下面的命令，启动服务
 
 ```bash
-# node进程会监听9299端口
+# node进程会监听9229端口
 node --inspect 启动模块
 ```
 
@@ -4030,14 +4030,367 @@ node --inspect 启动模块
     "version": "0.2.0",
     "configurations": [
         {
+
             "type": "node",
+            // 调试的模式是附加模式
             "request": "attach",
+            // 调试的名字
             "name": "Attach",
+            // 端口
             "port": 9229,
+            // 跳过node_modules文件夹
             "skipFiles": [
                 "<node_internals>/**"
             ]
         }
     ]
 }
+```
+
+- 然后运行代码，再在调试页面点击运行调试
+
+
+## 跨域
+
+> 跨域问题其实是浏览器同源策略的限制
+
+- 同源策略是指：请求的页面和资源的协议，端口，主机名要完全相同
+- 浏览器不允许使用非同源数据
+
+> 解决跨域问题有两种方法：JSONP和CORS，前者是比较老的方法，后者是现在比较常用的
+
+### JSONP
+
+1. 浏览器端生成一个script元素，访问数据接口
+2. 服务器响应一段JS代码。调用某个函数，并把响应的数据传入
+
+- 对于客户端
+
+```js
+function jsonp(url){
+    const script = document.createElement("script")
+    script.src = url
+    document.body.appendChild(script)
+    script.onload = function(){
+        script.remove()
+    }
+}
+
+function callback(data){
+    console.log(data)
+}
+
+jsonp("http://127.0.0.1:8080/api")
+```
+
+- 对于服务端只需要将返回的数据变为字符串返回即可
+
+
+- JSONP的缺陷：
+    - 会严重影响服务器的正常响应格式
+    - 只能使用GET请求 
+
+### CORS
+
+![alt text](image-27.png)
+
+针对不同的请求，CORS规定了三种不同的交互模式，分别是：
+- 简单请求
+- 需要预检的请求
+- 附带身份凭证的请求
+
+
+#### 简单请求
+
+> 当浏览器端运行一段ajax代码，浏览器会首先判断它属于哪一种请求模式
+
+- 简单请求的判定
+
+当同时满足以下条件时，浏览器会认为它是一个简单请求：
+1. 请求方法属于下面的一种
+    - get
+    - post
+    - head
+2. 请求头包含安全的字段，常见的安全字段如下
+    - Accept
+    - Accept-Language
+    - Content-Language
+    - Content-Type
+    - DPR
+    - Downlink
+    - Save-Data
+    - Viewport-Width
+    - Width
+3. 请求头如果包含Content-Type，它的值只允许是下面几种之一
+    - text/publishSpan
+    - multipart/form-data
+    - application/x-www-form-urlencoded
+如果以上三个条件同时满足，浏览器判定为简单请求
+
+```js
+// 简单请求
+fetch("http://xxx.com/api")
+
+// 请求方法不满足，不是简单请求
+fetch("http://xxx.com/api",{
+    method: "put"
+})
+
+// 加了额外的请求头，不是简单请求
+fetch("http://xxx.com/api",{
+    headers: {
+        "a":1
+    }
+})
+
+// content-type不满足要求，不是简单请求
+fetch("http://xxx.com/api",{
+    headers: {
+        "content-type": "application/json"
+    }
+})
+```
+
+- 简单请求的交互规范
+
+当浏览器判定某个ajax跨域请求是简单请求时，会发生下面的事情：
+1. 请求头中会自动添加Origin字段
+
+    比如，在页面`http://my.com/index.html`中有以下代码造成了跨域
+    ```js
+    // 简单请求
+    fetch("http://cross.com/api")
+    ```
+    发出请求以后请求头会是下面的格式
+    ```text
+    GET /api HTTP/1.1
+    Host: cross.com
+    Connection: keep-alive
+    ...
+    Referer: http://my.com/index.html
+    Origin: http://my.com
+    ```
+    Origin字段会告诉服务器，是哪个源地址在跨域请求
+
+2. 服务器响应头中应包含Access-Control-Allow-Origin
+
+    当服务器收到请求后，如果允许请求跨域访问，需要在响应头中包含Access-Control-Allow-Origin字段
+    该字段的值可以是：
+    - *：表示允许所有源地址访问
+    - 具体的源： 比如http://my.com 表示就允许http://my.com这个源地址访问
+
+![alt text](image-28.png)
+
+
+#### 需要预检的请求
+
+浏览器如果不认为这是一种简单请求，就会按照下面的流程进行：
+1. 浏览器发送预检请求，询问服务器是否允许
+2. 服务器允许
+3. 浏览器发送真实请求
+4. 服务器完成真实请求的响应
+
+比如在页面`http://my.com/index.html`中有以下代码造成了跨域
+```js
+// 需要预检的请求
+fetch("http://cross.com/api",{
+    method: "POST",
+    headers: {
+        "a":1,
+        "b":2,
+        "content-type": "application/json"
+    },
+    body: JSON.stringify({name:"mzmm",age:18}) // 设置请求体
+})
+```
+
+对应上面的请求流程
+1. 发送预检请求,看服务器是否允许
+```text
+OPITIONS /api HTTP/1.1
+Host: cross.com
+...
+Origin: http://my.com
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: a,b,content-type
+```
+预检请求有以下特征：
+- 请求方法为OPTIONS
+- 没有请求体
+- 请求头中包含
+    - Origin：表示请求的源地址
+    - Access-Control-Request-Method：表示后续真实请求的请求方法
+    - Access-Control-Request-Headers：表示后续真实请求会改动的请求头
+
+2. 服务器允许
+
+服务器收到预检请求，可以检查预检请求中包含的信息，如果允许这样的请求，需要响应下面的消息格式
+
+```text
+HTTP/1.1 200 OK
+Date: Tue, 23 May 2024 09:56:47 GMT
+...
+Access-Control-Allow-Origin: http://my.com
+Access-Control-Allow-Methods: POST
+Access-Control-Allow-Headers: a,b,content-type
+Access-Control-Max-Age: 86400
+...
+```
+
+对于预检请求，不需要响应任何的消息体，只需要在响应头中添加：
+- Access-Control-Allow-Origin：表示允许哪个源地址访问
+- Access-Control-Allow-Methods：表示允许哪些请求方法
+- Access-Control-Allow-Headers：表示允许哪些请求头
+- Access-Control-Max-Age：表示多少秒以内对于同样的请求源、方法、头都不需要再发送预检请求
+
+
+3. 浏览器发送真实请求
+
+预请求被允许后，浏览器发送真实请求
+
+```text
+POST /api HTTP/1.1
+Host: cross.com
+Connection: keep-alive
+...
+Referer: http://my.com/index.html
+Origin: http://my.com
+
+{"name":"mzmm","age":18}
+```
+
+4. 服务器响应真实请求
+
+```text
+HTTP/1.1 200 OK
+Date: Tue, 23 May 2024 10:56:47 GMT
+...
+Access-Control-Allow-Origin: http://my.com
+...
+
+添加成功
+```
+
+![alt text](image-29.png)
+
+
+#### 附带身份凭证的请求
+
+默认情况下，ajax的跨域请求并不会附带cookie，这样一来，某些需要权限的操作就无法进行
+不过可以通过简单的配置就可以实现附带cookie
+
+```js
+// xhr
+var xhr = new XMLHttpRequest()
+xhr.withCredentials = true
+
+// fetch api
+fetch(url,{
+    credentials: "include"  // 始终带带cookie
+})
+```
+这样一来，该跨域的ajax请求就是一个附带身份凭证的请求了
+当请求需要附带cookie时，，无论是简单还是预检请求都会在请求头中添加cookie字段，服务器响应也需要明确告诉客户端：服务器允许这样的凭据
+服务器只需要在响应头中添加：Access-Control-Allow-Credentials: true即可
+对于一个附带身份凭证的请求，若服务器没有告知，浏览器仍然视为跨域请求被拒绝
+
+
+**为什么不推荐使用`*`是因为对于附带身份凭证的请求，服务器不得设置Access-Control-Allow-Origin为`*`**
+
+
+#### 补充
+
+在跨域访问时，JS只能拿到一些基本的响应头，如果你在预检请求头新增了一些请求头属性默认是拿不到的，因此需要设置
+
+通过Access-Control-Expose-Headers来设置哪些请求头可以拿到,例如：
+```text
+Access-Control-Expose-Headers: a,b,authorization
+```
+这样JS就能访问指定的响应头了
+
+
+#### 自定义的跨域中间件示例
+
+```js
+
+const allowOrigins = [
+    "http://127.0.0.1:5500",
+    "null"
+]
+
+module.exports = function(req,res,next){
+    // 处理预检请求
+    if(req.method === "OPTIONS"){
+        res.header("Access-Control-Allow-Methods",req.headers["access-control-request-method"])
+        res.header("Access-Control-Allow-Headers",req.headers["access-control-request-headers"])
+    }
+    res.header("Access-Control-Allow-Credentials",true)
+    // 处理简单的请求
+    if("origin" in req.headers && allowOrigins.includes(req.headers.origin)){
+        res.header("access-control-allow-origin",req.headers.origin)
+    }
+    next()
+}
+```
+
+
+
+#### CORS
+
+> CORS时第三方封装的中间件，我们可以直接使用，不需要自己手写
+
+- 安装
+
+```bash
+npm i cors
+```
+
+```js
+const cors = require("cors")
+
+// 所有都允许跨域,但是不允许带cookie
+app.use(cors())
+
+// 针对某一个路由进行跨域
+app.get("/api",cors(),(req,res)=>{
+    res.json({msg:"hello"})
+})
+
+
+// 根据配置进行跨域
+let corsConfig = {
+    origin: "http://127.0.0.1:5500",
+    // 默认是204，204就是原来form表单提交完以后不进行跳转
+    optionsSuccessStatus: 200, 
+}
+
+app.get("/api",cors(corsConfig),(req,res)=>{
+    res.json({msg:"hello"})
+})
+
+// 白名单
+let whiteList = ["http://127.0.0.1:5500","http://localhost:5600"]
+let corsConfig = {
+    origin: function(origin,callback){
+        if(whiteList.indexOf(origin) !== -1){
+            callback(null,true)
+        }else{
+            callback(new Error("跨域失败"))
+        }
+    }
+}
+
+app.get("/api",cors(corsConfig),(req,res)=>{
+    res.json({msg:"hello"})
+})
+
+
+// 携带cookie
+// 在cors中Access-Control-Allow-Credentials对应的是credentials
+let corsConfig = {
+    credentials:true
+}
+app.get("/api",cors(corsConfig),(req,res)=>{
+    res.json({msg:"hello"})
+})
 ```
