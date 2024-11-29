@@ -3704,303 +3704,6 @@ nodemon.json
 }
 ```
 
-## cookie
-
-### cookie的组成
-> cookie不需要人工管理，服务器发送cookie令牌给浏览器，浏览器会自动进行存储，当请求资源的时候会自动判断cookie符不符合要求，符合就携带cookie进行资源请求
-
-
-- key：键，比如身份编号
-- value：值，比如用户信息，当然可以是任何信息，基本小于4KB
-- domain：域，表达这个cookie属于哪个网站，比如mzmm.top，表示cookie属于mzmm.top这个网站
-- path：路径，表示这个cookie属于哪个路径，比如/api/student，表示cookie只属于/api/student这个路径
-- secure：是否使用安全传输
-- expire：过期时间，表示cookie在什么时候过期
-
-**如果一个cookie同时满足下面条件，则这个cookie会被携带进行请求**
-- cookie没过期
-- cookie中的域和这次请求的域是匹配的
-    - cookie不在乎端口
-    - `www.baidu.com`和`baidu.com`在cookie中是有区分的
-- cookie中的path和这次请求的news是匹配的
-    - cookie的path是`/`可以匹配所有路径
-    - cookie的path是`/api`可以匹配`/api/a`，`/api/a/b`
-- 验证cookie的安全传输
-    - cookie的secure是true，则只能使用https传输
-    - cookie的secure是false，则可以使用http和https传输
-满足了上面的条件，则浏览器会携带cookie进行请求，将cookie放到请求头中，cookie的值格式是`键=值;键=值;...;键=值`这样的形式
-
-
-### 设置cookie
-
-cookie的两种设置模式
-
-- 服务器响应：这种模式非常普遍，当服务器决定给客户颁发一个证件，它会在响应的消息中包含cookie，浏览器会自动把cookie保存到卡包中
-- 客户端自行设置：这种模式少见但是也有，比如用户关闭了某个广告，并选择了以后不弹出，此时就可以把这种小信息直接通过浏览器的JS代码保存到cookie，后续请求服务器时，服务器会看到客户端不想弹出广告，于是就不发广告
-
-#### 服务器设置cookie
-
-服务器可以通过设置响应头，来告诉浏览器应该如何设置cookie
-
-响应头按照如下格式
-
-```yaml
-set-cookie: cookie1,
-set-cookie: cookie2,
-set-cookie: cookie3,
-```
-
-
-其中cookie的格式如下
-```yaml
-键=值;paht=?;domain=?;expires=?;max-age=?;secure=?;httponly;
-```
-每个cookie除了键值是必要的其他都是可选的
-
-- expire： 这里必须是一个校友的GMT时间。即格林威治标准时间字符串，比如`Fri, 12 Dec 2020 07:58:34 GMT`
-- max-age：cookie的有效时间，单位是秒，如果exprie和max-age同时不存在，那就表示会话结束就过期
-- httponly：设置cookie是否仅能用域传输。如果设置了改值，表示改cookie仅用于传输，而不允许在客户端通过js获取
-
-服务端设置cookie示例
-
-```js
-
-```
-
-
-#### 客户端设置cookie
-
-```yaml
-document.cookie = "键=值;paht=?;domain=?;expires=?;max-age=?;secure=?;"
-```
-可以看出，在客户端设置cookie，和服务器设置cookie的格式一样，只是有以下不同：
-- 没有httponly
-- path的默认值是当前网页的path，与服务器设置cookie的path不同，服务端是请求的路径
-- domain的默认值是当前网页的domain，与服务器设置cookie的domain不同，服务端的domain是请求的域
-
-
-
-#### cookie-parser
-> 针对于cookie的中间件
-
-- 安装
-
-```bash
-npm i cookie-parser
-```
-
-- 使用
-
-```js
-// 引入cookie-parser
-const cookieParser = require('cookie-parser');
-// 解析cookie的中间件
-// 加入以后会在req对象中注入一个cookies属性，用域获取所有请求传递过来的cookie
-// 加入以后会在res对象中注入cookie方法，用于设置cookie
-app.use(cookieParser());
-
-
-// 使用
-const express = require('express');
-const adminServ = require("../services/adminService")
-const { asyncHandler } = require("../middleware/getSendResult")
-const router = express.Router();
-
-router.post("/login",asyncHandler(async (req, res) => {
-    const result = await adminServ.login(req.body.loginId,req.body.loginPwd);
-    if(result){
-        // 登录成功
-        // 设置cookie
-        const value = result.id
-        /**
-         * cookie的参数
-         * 1. cookie的名称
-         * 2. cookie的值
-         * 3. cookie的配置项
-         */
-        // 针对浏览器
-        res.cookie("token",value,{
-            path: "/",
-            // 单位：ms
-            maxAge: 7*24*3600*1000,
-        })
-        // 针对非浏览器的其他设备
-        res.header("authorization",value)
-    }
-    return result
-}))
-
-module.exports = router;
-```
-
-登录成功后给予token
-    - 通过cookie给予：适配浏览器
-    - 通过header给予，适配其他终端
-
-对后续请求的认证
-    - 解析cookie或header中的token
-    - 验证token的合法
-        - 通过验证给予后续处理
-        - 未通过给予错误
-
-以下是针对token的中间件处理逻辑
-
-这里因为得考虑不是所有的页面都需要token，因此需要对请求的api做一个筛选
-这里介绍一个库`path-to-regexp`,这个库是用来解析路径使用正则来判断的
-
-```bash
-npm i path-to-regexp
-```
-
-```js
-const { getErr } = require('./getSendResult')
-const { pathToRegexp} = require("path-to-regexp")
-const needTokenApi = [
-    {method:"POST",path:"/api/user/:name"},
-]
-// 用于解析token
-module.exports = (req,res,next) => {
-    const apis = needTokenApi.filter(api => {
-        const reg = pathToRegexp(api.path)
-        return api.method === req.method && reg.regexp.test(req.path)
-    })
-    if(apis.length != 0){
-        next()
-        return
-    } 
-    let token = req.cookies.token
-    if(!token){
-        // 如果不能响应头中直接获取的token就在authorization中获取
-        token = req.headers.authorization
-    }
-    if(!token){
-        // 没有token则直接返回
-        handleNonToken(req,res,next)
-        return 
-    }
-    // 验证token是否有效
-    // ...
-    // 往后续提交
-    next()
-}
-
-// 处理token未认证
-function handleNonToken(req,res,next){
-    res
-        .status(403)
-        .send(
-            getErr('No access permission',403)
-        )
-}
-```
-
-```js
-// 记得在使用中间件的时候是有顺序的
-
-const express = require('express');
-const studentRouter = require("./studetn")
-const adminRouter = require("./admin")
-const { errorHandler } = require("../middleware/errorMiddleware")
-const cookieParser = require('cookie-parser');
-
-const app = express();
-
-app.use(cookieParser());
-app.use(require("../middleware/tokenMiddleware"))
-app.use(express.json());
-app.use("/api/user", adminRouter)
-app.use("/api/student", studentRouter)
-app.use(errorHandler)
-
-const port = 8080
-
-app.listen(port, () => {
-    console.log(`Server is running on http://127.0.0.1:${port}.`);
-});
-```
-
-
-- 上面虽然解决了cookie的问题但是不安全，因为cookie是明文传输的，因此我们要对cookie进行加密
-
-> cookie-parser提供了一种默认的加密方式，使用的是对称加密
-
-```js
-// 首先传递一个密钥"mzmm"
-app.use(cookieParser('mzmm'));
-
-// 发送cookie的时候传递一个参数（signed）
-adminRouter.post(
-    "/login",
-    asyncHandler(
-        async (req, res) => {
-            const result = await adminServ.login(req.body.loginId,req.body.loginPwd);
-            if(result){
-                // 登录成功
-                // 设置cookie
-                const value = result.id
-                /**
-                 * cookie的参数
-                 * 1. cookie的名称
-                 * 2. cookie的值
-                 * 3. cookie的配置项
-                 */
-                // 针对浏览器
-                res.cookie("token",value,{
-                    // 单位：ms
-                    maxAge: 7*24*3600*1000,
-                    //  设置cookie是否加密
-                    signed: true
-                })
-                // 针对非浏览器的其他设备
-                res.header("authorization",value)
-            }
-            return result
-        }
-    )
-)
-
-
-// 这个时候客户端从cookie里面获取token也得换了
-// 之前使用的是req.cookies.token
-// 现在使用的是req.signedCookies.token
-
-let token = req.signedCookies.token
-    if(!token){
-        // 如果不能响应头中直接获取的token就在authorization中获取
-        token = req.headers.authorization
-    }
-    if(!token){
-        // 没有token则直接返回
-        handleNonToken(req,res,next)
-        return 
-    }
-```
-
-- 上面的这种加密方法虽然方便，因为是别人封装好的，但是这样一来header也得用同样的加密方式，因此可以自己写一个加密方法
-
-```js
-const crypto = require('crypto');
-// 这里使用aes128
-// 128位密钥
-const secret = Buffer.from('ymoml6zr9w4dwhos');
-// 这里的vi应该写成随机的，为了方便测试我这里写死
-const iv = Buffer.from('xr7woh0qf4t6bj7b');
-
-exports.encrypt = function(str) {
-    const cry = crypto.createCipheriv("aes-128-cbc", secret, iv)
-    let res = cry.update(str, 'utf8', 'hex')
-    res += cry.final('hex')
-    return res
-};
-
-exports.decrypt = function(signed) {
-    const decry = crypto.createDecipheriv("aes-128-cbc", secret, iv)
-    let res = decry.update(signed, 'hex', 'utf8')
-    res += decry.final('utf8')
-    return res
-}
-```
-
 ## 断点调试
 
 **对于浏览器调试如下**
@@ -4372,10 +4075,16 @@ app.get("/api",cors(corsConfig),(req,res)=>{
 let whiteList = ["http://127.0.0.1:5500","http://localhost:5600"]
 let corsConfig = {
     origin: function(origin,callback){
+        if(!origin){
+            callback(null,"*")
+            return
+        }
         if(whiteList.indexOf(origin) !== -1){
             callback(null,true)
+            return
         }else{
             callback(new Error("跨域失败"))
+            return
         }
     }
 }
@@ -4393,4 +4102,642 @@ let corsConfig = {
 app.get("/api",cors(corsConfig),(req,res)=>{
     res.json({msg:"hello"})
 })
+```
+
+## cookie
+
+- 优点
+    - 存储在客户端，不占用服务器资源
+- 缺点
+    - 只能是字符串格式
+    - 存储量有限制
+    - 数据容易被获取篡改
+    - 容易丢失
+
+### cookie的组成
+> cookie不需要人工管理，服务器发送cookie令牌给浏览器，浏览器会自动进行存储，当请求资源的时候会自动判断cookie符不符合要求，符合就携带cookie进行资源请求
+
+
+- key：键，比如身份编号
+- value：值，比如用户信息，当然可以是任何信息，基本小于4KB
+- domain：域，表达这个cookie属于哪个网站，比如mzmm.top，表示cookie属于mzmm.top这个网站
+- path：路径，表示这个cookie属于哪个路径，比如/api/student，表示cookie只属于/api/student这个路径
+- secure：是否使用安全传输
+- expire：过期时间，表示cookie在什么时候过期
+
+**如果一个cookie同时满足下面条件，则这个cookie会被携带进行请求**
+- cookie没过期
+- cookie中的域和这次请求的域是匹配的
+    - cookie不在乎端口
+    - `www.baidu.com`和`baidu.com`在cookie中是有区分的
+- cookie中的path和这次请求的news是匹配的
+    - cookie的path是`/`可以匹配所有路径
+    - cookie的path是`/api`可以匹配`/api/a`，`/api/a/b`
+- 验证cookie的安全传输
+    - cookie的secure是true，则只能使用https传输
+    - cookie的secure是false，则可以使用http和https传输
+满足了上面的条件，则浏览器会携带cookie进行请求，将cookie放到请求头中，cookie的值格式是`键=值;键=值;...;键=值`这样的形式
+
+
+### 设置cookie
+
+cookie的两种设置模式
+
+- 服务器响应：这种模式非常普遍，当服务器决定给客户颁发一个证件，它会在响应的消息中包含cookie，浏览器会自动把cookie保存到卡包中
+- 客户端自行设置：这种模式少见但是也有，比如用户关闭了某个广告，并选择了以后不弹出，此时就可以把这种小信息直接通过浏览器的JS代码保存到cookie，后续请求服务器时，服务器会看到客户端不想弹出广告，于是就不发广告
+
+#### 服务器设置cookie
+
+服务器可以通过设置响应头，来告诉浏览器应该如何设置cookie
+
+响应头按照如下格式
+
+```yaml
+set-cookie: cookie1,
+set-cookie: cookie2,
+set-cookie: cookie3,
+```
+
+
+其中cookie的格式如下
+```yaml
+键=值;paht=?;domain=?;expires=?;max-age=?;secure=?;httponly;
+```
+每个cookie除了键值是必要的其他都是可选的
+
+- expire： 这里必须是一个校友的GMT时间。即格林威治标准时间字符串，比如`Fri, 12 Dec 2020 07:58:34 GMT`
+- max-age：cookie的有效时间，单位是秒，如果exprie和max-age同时不存在，那就表示会话结束就过期
+- httponly：设置cookie是否仅能用域传输。如果设置了改值，表示改cookie仅用于传输，而不允许在客户端通过js获取
+
+服务端设置cookie示例
+
+```js
+
+```
+
+
+#### 客户端设置cookie
+
+```yaml
+document.cookie = "键=值;paht=?;domain=?;expires=?;max-age=?;secure=?;"
+```
+可以看出，在客户端设置cookie，和服务器设置cookie的格式一样，只是有以下不同：
+- 没有httponly
+- path的默认值是当前网页的path，与服务器设置cookie的path不同，服务端是请求的路径
+- domain的默认值是当前网页的domain，与服务器设置cookie的domain不同，服务端的domain是请求的域
+
+
+
+#### cookie-parser
+> 针对于cookie的中间件
+
+- 安装
+
+```bash
+npm i cookie-parser
+```
+
+- 使用
+
+```js
+// 引入cookie-parser
+const cookieParser = require('cookie-parser');
+// 解析cookie的中间件
+// 中间件用来解析cookie
+app.use(cookieParser());
+
+
+// 使用
+const express = require('express');
+const adminServ = require("../services/adminService")
+const { asyncHandler } = require("../middleware/getSendResult")
+const router = express.Router();
+
+router.post("/login",asyncHandler(async (req, res) => {
+    const result = await adminServ.login(req.body.loginId,req.body.loginPwd);
+    if(result){
+        // 登录成功
+        // 设置cookie
+        const value = result.id
+        /**
+         * cookie的参数
+         * 1. cookie的名称
+         * 2. cookie的值
+         * 3. cookie的配置项
+         */
+        // 针对浏览器
+        res.cookie("token",value,{
+            path: "/",
+            // 单位：ms
+            maxAge: 7*24*3600*1000,
+        })
+        // 针对非浏览器的其他设备
+        res.header("authorization",value)
+    }
+    return result
+}))
+
+module.exports = router;
+```
+
+登录成功后给予token
+    - 通过cookie给予：适配浏览器
+    - 通过header给予，适配其他终端
+
+对后续请求的认证
+    - 解析cookie或header中的token
+    - 验证token的合法
+        - 通过验证给予后续处理
+        - 未通过给予错误
+
+以下是针对token的中间件处理逻辑
+
+这里因为得考虑不是所有的页面都需要token，因此需要对请求的api做一个筛选
+这里介绍一个库`path-to-regexp`,这个库是用来解析路径使用正则来判断的
+
+```bash
+npm i path-to-regexp
+```
+
+```js
+const { getErr } = require('./getSendResult')
+const { pathToRegexp} = require("path-to-regexp")
+const needTokenApi = [
+    {method:"POST",path:"/api/user/:name"},
+]
+// 用于解析token
+module.exports = (req,res,next) => {
+    const apis = needTokenApi.filter(api => {
+        const reg = pathToRegexp(api.path)
+        return api.method === req.method && reg.regexp.test(req.path)
+    })
+    if(apis.length != 0){
+        next()
+        return
+    } 
+    let token = req.cookies.token
+    if(!token){
+        // 如果不能响应头中直接获取的token就在authorization中获取
+        token = req.headers.authorization
+    }
+    if(!token){
+        // 没有token则直接返回
+        handleNonToken(req,res,next)
+        return 
+    }
+    // 验证token是否有效
+    // ...
+    // 往后续提交
+    next()
+}
+
+// 处理token未认证
+function handleNonToken(req,res,next){
+    res
+        .status(403)
+        .send(
+            getErr('No access permission',403)
+        )
+}
+```
+
+```js
+// 记得在使用中间件的时候是有顺序的
+
+const express = require('express');
+const studentRouter = require("./studetn")
+const adminRouter = require("./admin")
+const { errorHandler } = require("../middleware/errorMiddleware")
+const cookieParser = require('cookie-parser');
+
+const app = express();
+
+app.use(cookieParser());
+app.use(require("../middleware/tokenMiddleware"))
+app.use(express.json());
+app.use("/api/user", adminRouter)
+app.use("/api/student", studentRouter)
+app.use(errorHandler)
+
+const port = 8080
+
+app.listen(port, () => {
+    console.log(`Server is running on http://127.0.0.1:${port}.`);
+});
+```
+
+
+- 上面虽然解决了cookie的问题但是不安全，因为cookie是明文传输的，因此我们要对cookie进行加密
+
+> cookie-parser提供了一种默认的加密方式，使用的是对称加密
+
+```js
+// 首先传递一个密钥"mzmm"
+app.use(cookieParser('mzmm'));
+
+// 发送cookie的时候传递一个参数（signed）
+adminRouter.post(
+    "/login",
+    asyncHandler(
+        async (req, res) => {
+            const result = await adminServ.login(req.body.loginId,req.body.loginPwd);
+            if(result){
+                // 登录成功
+                // 设置cookie
+                const value = result.id
+                /**
+                 * cookie的参数
+                 * 1. cookie的名称
+                 * 2. cookie的值
+                 * 3. cookie的配置项
+                 */
+                // 针对浏览器
+                res.cookie("token",value,{
+                    // 单位：ms
+                    maxAge: 7*24*3600*1000,
+                    //  设置cookie是否加密
+                    signed: true
+                })
+                // 针对非浏览器的其他设备
+                res.header("authorization",value)
+            }
+            return result
+        }
+    )
+)
+
+
+// 这个时候客户端从cookie里面获取token也得换了
+// 之前使用的是req.cookies.token
+// 现在使用的是req.signedCookies.token
+
+let token = req.signedCookies.token
+    if(!token){
+        // 如果不能响应头中直接获取的token就在authorization中获取
+        token = req.headers.authorization
+    }
+    if(!token){
+        // 没有token则直接返回
+        handleNonToken(req,res,next)
+        return 
+    }
+```
+
+- 上面的这种加密方法虽然方便，因为是别人封装好的，但是这样一来header也得用同样的加密方式，因此可以自己写一个加密方法
+
+```js
+const crypto = require('crypto');
+// 这里使用aes128
+// 128位密钥
+const secret = Buffer.from('ymoml6zr9w4dwhos');
+// 这里的vi应该写成随机的，为了方便测试我这里写死
+const iv = Buffer.from('xr7woh0qf4t6bj7b');
+
+exports.encrypt = function(str) {
+    const cry = crypto.createCipheriv("aes-128-cbc", secret, iv)
+    let res = cry.update(str, 'utf8', 'hex')
+    res += cry.final('hex')
+    return res
+};
+
+exports.decrypt = function(signed) {
+    const decry = crypto.createDecipheriv("aes-128-cbc", secret, iv)
+    let res = decry.update(signed, 'hex', 'utf8')
+    res += decry.final('utf8')
+    return res
+}
+```
+
+
+## session
+
+### 原理
+
+- 存储在服务器
+- 优点
+    - 可以是任何格式
+    - 存储量理论上是无限的
+    - 数据难以被获取篡改
+    - 不易丢失
+- 缺点
+    - 占用服务器资源
+
+
+- 原理
+
+> 在讲原理之前首先得提一个概念uuid(universally unique identifier)全球唯一id,
+> uuid就是拿当前的时间戳，设备的mac地址，计数器和算法生成一个id
+
+![alt text](image-30.png)
+
+
+### express-session
+
+- 安装
+
+```bash
+npm i express-session
+```
+
+- 使用
+
+```js
+const session = require('express-session')
+
+app.use(session({
+    // 对客户端的id进行加密
+    // keyboard是密钥
+    secret: 'keyboard',
+    // 改sessionid的名称
+    name: 'session-id',
+}))
+```
+
+
+当使用session的时候，以登录为例，登陆成功的时候可以让`session.loginUser`去记录登录状态或者登录的账号密码信息，在session的中间件中判断sessiion.loginUser是否存在
+
+
+```js
+// 原有的登录逻辑
+const result = await adminServ.login(req.body.loginId,req.body.loginPwd);
+if(result){
+    // 登录成功
+    // 设置cookie
+    let value = result.id
+    value = cryptor.encrypt(value.toString())
+    /**
+     * cookie的参数
+     * 1. cookie的名称
+     * 2. cookie的值
+     * 3. cookie的配置项
+     */
+    // 针对浏览器
+    res.cookie("token",value,{
+        // 单位：ms
+        maxAge: 7*24*3600*1000,
+    })
+    // 针对非浏览器的其他设备
+    res.header("authorization",value)
+}
+return result
+
+// 更改以后
+const result = await adminServ.login(req.body.loginId,req.body.loginPwd);
+if(result){
+    // 登录成功
+    req.session.loginUser = result
+}
+return result
+
+
+// session的中间件
+if(req.session.loginUser){
+    // 登录成功
+    next()
+}else{
+    haanldeNonToken(req,res,next)
+}
+```
+
+
+
+## jwt
+
+### 原理
+
+jwt令牌可以出现响应的任何一个地方，客户端和服务器自行约定即可
+你可以储存到任何位置，比如手机文件、PC文件、localstorage、cookie等
+虽然jwt没有明确要求应该如何附带到请求中，但通常我们会使用如下的格式
+
+
+```text
+GET /api/resources HTTP/1.1
+...
+authorization: bearer jwt令牌
+...
+```
+
+> 这个格式是OAuth2附带token的一种规范格式
+这样一来，服务器就能够收到这个令牌，通过对令牌的验证，即可知道该令牌是否生效
+整个流程如下图，客户端登录，服务器给令牌，下次请求携带令牌，服务器验证令牌是否有效
+
+![alt text](image-31.png)
+
+
+### 令牌组成
+为了保证令牌的安全性，jwt令牌由三个部分组成，分别是：
+1. header： 令牌头部，记录了整个令牌的类型和签命算法
+2. payload： 令牌的载荷，记录了保存的主体信息，比如你要保存的用户信息就可以放到这里
+3. signature： 令牌的签名，按照头部固定的签命算法对整个令牌进行签名，该签名的作用是：保证令牌不被伪造和篡改
+
+它们组合而成的完整格式是：`header.payload.signature`
+
+比如一个完整的jwt令牌如下：
+
+```text
+eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.
+eyJsb2dpblR5cGUiOiJsb2dpbiIsImxvZ2luSWQiOiJzeXNfdXNlcjoxIiwicm5TdHIiOiJDOVJtbGlFRUNoZldkTEo4MUtab1NRS0g0bnl5bEJFbiJ9.
+BmgPE8yth_sfOJG4ubE1lq94QG_XHN-Eg9mWN5aiJkw
+```
+
+它各个部分的值分别是：
+- `header：eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9`
+- `payload：eyJsb2dpblR5cGUiOiJsb2dpbiIsImxvZ2luSWQiOiJzeXNfdXNlcjoxIiwicm5TdHIiOiJDOVJtbGlFRUNoZldkTEo4MUtab1NRS0g0bnl5bEJFbiJ9`
+- `signature：BmgPE8yth_sfOJG4ubE1lq94QG_XHN-Eg9mWN5aiJkw`
+
+#### header
+
+它是令牌头部，记录了整个令牌的类型和签名算法
+它的格式是一个json对象，如下：
+
+```json
+{
+    "alg":"HS256",
+    "type":"JWT"
+}
+```
+- alg： signature部分使用的签名算法，通常可以取两个值
+    - HS256：一种对称加密算法，使用同一个密钥对signature加密解密
+    - RS256：一种非对称加密算法，使用私钥加密，公钥解密
+- typ：整个令牌的类型，固定为JWT
+
+设置好`header`之后，需要对其进行base64url编码
+浏览器提供的btoa函数，可以完成这个操作
+
+```js
+window.btoa(
+    JSON.stringify({
+        alg:"HS256",
+        typ:"JWT"
+    })
+)
+```
+同样的，浏览器提供了atob函数，可以完成base64url解码
+```js
+window.atob("eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9")
+```
+
+
+#### payload
+这部分是jwt的主题信息，它仍然是一个JSON对象，它可以包含以下内容
+
+```json
+{
+    "ss":"发行者",
+    "iat":"发行时间",
+    "exp":"过期时间",
+    "sub":"主题",
+    "aud":"听众",
+    "nbf":"在此之前不可用",
+    "jti":"JWT ID"
+}
+```
+
+以上的属性可以全写，也可以一个都不写，它只是一个规范，就算写了，也需要你在将来验证这个jwt令牌时手动处理才能发挥作用
+
+各个字段的表达的含义
+
+- ss: 发行该jwt的是谁，可以写公司的名字，也可以写服务名称
+- iat: 该jwt的开放时间，通常时写当前时间戳
+- exp: 该jwt的到期时间，通常时写当前时间戳
+- sub: 该jwt是用于干什么的
+- aud: 该jwt时发放给哪个终端的，可以是终端类型，也可以是用户名称，随意一点
+- nbf: 一个时间点，在改时间点到达之前是不可以用的
+- jti: jwt的唯一编号，设置此项目的目的主要是为了防止重放攻击
+
+
+payload这一部分其实就是一个json对象，用来存信息的，比如登陆成功的用户id、账号等角色信息
+下面这个json对象仍然是一个有效的payload的
+
+```json
+{
+    "foo":"foo",
+    "any":1213,
+    "iat":1563027489
+}
+```
+
+最终payload部分和header一样，需要通过`base64 url`编码
+
+```js
+window.btoa(JSON.stringify({
+    foo:"foo",
+    any:1213,
+    iat:1563027489
+}))
+```
+
+#### signature
+
+这一部分是jwt的签名，正是它的存在，保证了整个jwt不被篡改
+这部分的生成是前面两个部分编码的结果按照头部指定的方式进行加密,这里当然你得指定一个密钥
+比如指定密钥是`mzmm`
+
+```js
+HS256(`eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJsb2dpblR5cGUiOiJsb2dpbiIsImxvZ2luSWQiOiJzeXNfdXNlcjoxIiwicm5TdHIiOiJDOVJtbGlFRUNoZldkTEo4MUtab1NRS0g0bnl5bEJFbiJ9`,"mzmm")
+```
+
+最终将三个部分组合在一起就能得到完整的jwt了
+由于签名使用的密钥是保存在服务器的，因此客户端无法篡改jwt令牌，保证了令牌的安全性
+
+
+### 令牌的验证
+
+- 首先服务器验证整个令牌是否被篡改过，对`header+payload`用同样的密钥进行加密然后
+- 将第一步䣌结果和从客户端传进来的`signature`进行比较
+- 如果被篡改验证失败，如果没被篡改进行其他验证：比如是否过期，听众是否满足要求等，视具体情况而定
+
+
+### jsonwebtoken
+
+> jsonwebtoken是jwt的一代库，后面有专门为express准备的叫express-jwt
+
+- 安装
+
+```bash
+npm i jsonwebtoken
+```
+
+- 基础使用
+
+```js
+const jwt = require('jsonwebtoken')
+const secrect = "mzmm"
+
+// 获取一个jwt
+const token = jwt.sign(
+    {
+        id: 1,
+        name: "mzmm",
+    }
+    secrect,
+    {
+        expiresIn: 3600,
+    }
+)
+
+
+// 解密一个jwt
+// 验证通过才能解出来
+const res = jwt.verify(token,secrect)
+```
+
+
+- 自己写的jwt中间件
+
+```js
+// 导入jwt库
+const jwt = require('jsonwebtoken');
+// 这个密钥最好随机生成
+const secrect = "mzmm"
+const cookieKey = "token"
+/**
+ * 
+ * @param {*} res 响应对象
+ * @param {*} maxAge 过期时间，默认24小时
+ * @param {*} info 载荷信息（payload）
+ */
+exports.publish = function(res,maxAge = 3600*24 ,info = {},){
+    const token = jwt.sign(info,secrect,{
+        expiresIn: maxAge // 过期时间
+    })
+    // 添加到cookie中
+    res.cookie(cookieKey,token,{
+        maxAge: maxAge * 1000, // cookie的过期时间和jwt保持一致
+        path: '/', // 路径
+    })
+
+    // 添加其他传输
+    res.header("authorization",token)
+}
+
+/**
+ * 
+ * @param {*} req 请求对象
+ * @returns 
+ */
+exports.verify = function (req) {
+    let token;
+    // 尝试从cookie中获取token
+    token = req.cookies[cookieKey]
+    if (!token) {
+        // 尝试从header中获取token
+        token = req.headers.authorization
+        if (!token) {
+            return null
+        }
+        token = token.split(' ') // authorization: Bearer token
+        token = token.length === 1 ? token[0] : token[1]
+    }
+    try{
+        const result = jwt.verify(token,secrect)
+        return result
+    } catch {
+        return null
+    }
+}
+
+
+// 生成jwt的逻辑放在登录逻辑中，登录成功就生成jwt
+// 验证jwt的逻辑放在token中间件中，调用上面的verify方法，看result是否有返回，有返回说明验证成功
 ```
