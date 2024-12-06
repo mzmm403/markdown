@@ -4741,3 +4741,7 @@ exports.verify = function (req) {
 // 生成jwt的逻辑放在登录逻辑中，登录成功就生成jwt
 // 验证jwt的逻辑放在token中间件中，调用上面的verify方法，看result是否有返回，有返回说明验证成功
 ```
+
+## 一些日常开发的场景
+
+### 日志记录
