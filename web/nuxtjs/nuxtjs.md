@@ -1,4 +1,4 @@
-# SSR 初识
+## SSR 基本介绍
 
 SSR (Server side Render) 服务器端渲染
 > 渲染：页面形成的过程，html文件，内容形成的过程
@@ -6,7 +6,7 @@ SSR (Server side Render) 服务器端渲染
 CSR (client side Render) 客户端渲染
 > 渲染： 页面内容通过js执行形成
 
-## 前端发展史
+### 前端发展史
 
 1. 静态页面阶段
 
@@ -49,3 +49,7 @@ CSR (client side Render) 客户端渲染
 > nodejs出现，会js就可以开发服务端
 
 缺点：服务端跑一次，客户端也要渲染
+
+
+## SSR基本API
+

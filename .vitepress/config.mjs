@@ -18,6 +18,7 @@ export default defineConfig({
         text: '前端',
         items: [
           { text: 'vue', link: '/web/vuejs/vue' },
+          { text: 'react', link: '/web/reactjs/index' },
           { text: 'vue全家桶', link: '/web/myrouter/router' },
           { text: 'vitest', link: '/web/vitest/index' },
           { text: 'less', link: 'web/css-less/index' },

@@ -1,5 +1,7 @@
 # 为什么要学习VueJs
 
+![alt text](image.png)
+
 ## 官网
 
 https://v3.cn.vuejs.org/guide/migration/introduction.html
