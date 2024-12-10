@@ -398,3 +398,362 @@ class Form extends React.Component {
 ```
 
 
+### 组件状态和数据传递
+
+- 组件状态
+- props
+- props验证
+- 状态提升
+
+#### 组件状态
+
+> 早期类组件被称之为有状态组件，就是因为在类组件中能维护组件数据
+
+```jsx
+class 类 extends React.Component {
+    constructor() {
+        super()
+        this.state = {
+            // 组件状态数据
+        }
+    }
+    render() {
+        return (
+            // 通过{this.state.xxx} 来获取状态数据
+        )
+    }
+}
+
+// 或者
+class 类名 extends React.Component {
+    state = {
+        // 组件状态数据
+    }
+    render(){
+        return (
+            // 通过{this.state.xxx} 来获取状态数据
+        )
+    }
+}
+
+
+// 关于类组件修改状态数据
+// 不要直接修改状态值，应该通过setState方法修改
+class 类名 extends React.Component {
+    state = {
+        num: 1
+    }
+
+    handleClick = () => {
+        // 修改num的值，+1
+        this.setState({
+            // 底层实际上就是调用了Object.assign()方法将新老对象合并
+            num: this.state.num + 1
+        })
+    }
+
+    render(){
+        return (
+            <>
+                <h1>{this.state.num}</h1>
+                <button onClick={this.handleClick}>点我</button>
+            </>
+        )
+    }
+}
+```
+
+`setState`它对状态的改变可能时异步的,处于性能的考虑，react会把多个`setState`的调用合并成一个调用
+如果改变状态的代码处于某个HTML元素的事件中就是异步的，否则是同步的
+
+
+```jsx
+state = {
+    num: 1
+}
+
+
+// 例如下面的代码，有多个`setState`调用，但是由于时异步的，
+// 因此他们拿到的`this.state.num`的值都是1，最终的结果就是2并非是4
+// 也就是相当于调用了三次this.setState({num: 1 + 1})
+
+handleClick = () => {
+        this.setState({
+            num: this.state.num + 1
+        })
+        this.setState({
+            num: this.state.num + 1
+        })
+        this.setState({
+            num: this.state.num + 1
+        })
+    }
+```
+
+
+如果在事件处理函数里面想要拿到setState执行后的数据，这里有两种方式
+
+```jsx
+// 1. 使用回调函数
+this.setState({
+    num: this.state.num + 1
+},() => {
+    console.log(this.state.num)
+})
+
+// 2. 提前使用变量存储
+let newNum = this.state.num + 1
+this.setState({
+    num: newNum
+})
+console.log(newNum)
+```
+
+**最佳实践**
+1. 把所有的setState当作是异步的
+2. 永远不要信任setState调用完后的值得状态，因为setState可能是异步的
+3. 如果要使用改变之后的状态，需要使用回调函数(setState的第二个参数)
+4. 如果新的状态要根据之前的状态进行运算，使用函数的方式改变状态(setState第一个参数)
+
+**这里写着会发现一个问题：就是在回调函数中处理改变后得数据会造成多次嵌套**
+react提供了解决办法，将函数作为参数传入`setState`，这个函数用上一个state作为第一个参数，将此次更新被应用时得props做为第二个参数
+
+```jsx
+this.setState(
+    // 函数得返回值是一个对象，`({})`，因此得用()否则会以为是函数的声明
+    (state,props) => ({
+        counter: state.counter + props.increment
+    })
+)
+```
+
+
+React将多次的setState进行合并调用(将多次状态改变完成，再统一对state进行改变，然后触发render)
+
+#### props
+
+> 组件之间进行数据的传递
+
+如果是父组件向子组件传递数据，则使用props
+
+如果是函数组件，props作为函数的一个参数传入
+
+```jsx
+function A(props) {
+    return (
+        // 通过props.xxx来获取props数据
+        <div>
+            <p>姓名：{props.userInfo.name}</p>
+            <p>年龄：{props.userInfo.age}</p>
+            <p>性别：{props.userInfo.sex}</p>
+            <p>content：{props.content}</p>
+        </div>
+    )
+}
+```
+
+如果是类组件，则需要在constructor中通过super(props)来获取
+
+```jsx
+class B extends React.Component {
+    render() {
+        return (
+            // 通过this.props.xxx来获取props数据
+            <div>
+                <p>姓名：{this.props.userInfo.name}</p>
+                <p>年龄：{this.props.userInfo.age}</p>
+                <p>性别：{this.props.userInfo.sex}</p>
+                <p>content：{this.props.content ? "true" : "false"}</p>
+            </div>
+        )
+    }
+}
+
+// 父组件
+import B from './B'
+import A from './A'
+
+function App() {
+    let userInfo = {
+        name: '张三',
+        age: 18,
+        sex: '男',
+    }
+
+    return (
+        <>
+            {/* 传递number类型 */}
+            <A userInfo={userInfo}, content={1}/>
+            {/* 传递boolean类型 */}
+            <B userInfo={userInfo}, content={true}/>
+        </>
+    )
+}
+```
+
+
+通过`props.children`可以实现类似于vue的插槽功能
+
+```jsx
+// 按钮组件代码
+// Button.jsx
+import React from 'react';
+
+class Button extends React.Component {
+    render() {
+        return (
+            <button>{this.props.children}</button>
+        )
+    }
+}
+
+export default Button;
+
+
+// 父组件代码
+// App.jsx
+import Button from "./components/Button"
+
+function App() {
+  return (
+      <Button>点我</Button>
+  )
+}
+
+export default App;
+
+```
+
+
+#### props验证
+
+在vue中，可以对传入的props设置默认值，验证props的有效性，在react中也可以
+
+通过defaultprops设置默认值
+
+```jsx
+// 函数式组件
+
+function A(props) {
+    return (
+        // 通过props.xxx来获取props数据
+        <div>
+            <p>姓名：{props.userInfo.name}</p>
+            <p>年龄：{props.userInfo.age}</p>
+            <p>性别：{props.userInfo.sex}</p>
+            <p>content：{props.content}</p>
+        </div>
+    )
+}
+
+//　设置默认值
+A.defaultProps = {
+    userInfo: {
+        name: '张三',
+        age: 18,
+        sex: '男'
+    },
+    content: 1
+}
+
+
+// 类组件
+class B extends React.Component {
+    render() {
+        return (
+            // 通过this.props.xxx来获取props数据
+            <div>
+                <p>姓名：{this.props.userInfo.name}</p>
+                <p>年龄：{this.props.userInfo.age}</p>
+                <p>性别：{this.props.userInfo.sex}</p>
+                <p>content：{this.props.content ? "true" : "false"}</p>
+            </div>
+        )
+    }
+}
+
+// 设置默认值
+B.defaultProps = {
+    userInfo: {
+        name: '张三',
+        age: 18,
+        sex: '男'
+    },
+    content: false
+}
+```
+
+
+类型检查，从Reactv15.5开始，移入到了prop-types模块中
+
+- 安装
+
+```shell
+npm i prop-types
+```
+
+- 使用
+
+```jsx
+import PropTypes from 'prop-types'
+
+function A(props) {
+    return (
+        <>
+            <p>姓名：{props.name}</p>
+        </>
+    )
+}
+
+// 类型检查
+A.propTypes = {
+    name: PropTypes.string
+}
+```
+
+
+
+#### 状态提升
+
+在vue中，父传子通过props，子传父通过触发自定义事件(emit)
+在React中，如果子组件要向父组件传递数据，同样是通过触发父组件传递给子组件的事情来进行传递的
+在官网被称为[状态提升](https://zh-hans.react.dev/learn/sharing-state-between-components)
+
+```jsx
+// Button.jsx
+import React from 'react';
+
+class Button extends React.Component {
+
+    ClickchangeState = ()=>{
+        this.props.changeState(3)
+    }
+
+    render() {
+        return (
+            <button onClick={this.ClickchangeState}>{this.props.children}</button>
+        )
+    }
+}
+
+export default Button;
+
+
+
+
+// App.jsx
+import Button from "./components/Button"
+
+function App() {
+
+    const handleChangeState = (num) => {
+        console.log("子组件传来的数据：",num)
+    }
+
+    return (
+        <>
+            <Button changeState={handleChangeState}>你好</Button>
+        </>
+    )
+}
+```
