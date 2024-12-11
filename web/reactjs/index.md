@@ -757,3 +757,341 @@ function App() {
     )
 }
 ```
+
+状态提升的案例
+```jsx
+// App.jsx
+import React from "react";
+import Money from "./components/Money";
+
+class App extends React.Component {
+    state = { 
+        usd:"",
+        rmb:""
+    }
+
+    toRMB = (value) => {
+        if(parseFloat(value) || value === "" || parseFloat(value) === 0){
+            this.setState({
+                usd: value,
+                rmb: value === "" ? "" : (value *7.3255).toFixed(2)
+            });
+        }else{
+            alert("请输入数字");
+        }
+    }
+
+    toUSD = (value) => {
+        if(parseFloat(value) || value === "" || parseFloat(value) === 0){
+            this.setState({
+                usd: value === "" ? "" : (value * 0.1365).toFixed(2),
+                rmb: value
+            });
+        }else{
+            alert("请输入数字");
+        }
+    }
+
+    render() {
+        return (
+            <>
+                <Money text="USD" money={this.state.usd} setMoney={this.toRMB}/>
+                <Money text="RMB" money={this.state.rmb} setMoney={this.toUSD}/>
+            </>
+        );
+    }
+}
+
+export default App;
+
+
+
+
+// Money.jsx
+function Money(props) {
+
+    function handleChange(e) {
+        props.setMoney(e.target.value);
+    }
+
+
+    return (
+        <fieldset>
+            <legend>{props.text}</legend>
+            <input type="text" value={props.money} onChange={handleChange}/>
+        </fieldset>
+    )
+}
+
+export default Money;
+```
+
+
+
+### 表单
+
+- 受控组件
+- 非受控组件
+- 列表和key
+
+
+#### 受控组件
+
+> 受控组件本质上其实就是将表单中的控件和视图模型进行绑定，之后都是针对状态进行操作，下面是具体案例
+
+- 一个基本的受控组件
+
+```jsx
+
+// 这里的视图模型其实就是这里的state，受控组件实际上就是组件受这里的state管控
+
+class App extends React.Component {
+    state = { 
+        value:""
+    }
+
+    handlerChange = (e) => {
+        this.setState({
+            value: e.target.value
+        })
+    }
+
+    render() {
+        return (
+            <>
+                <input type="text" value={this.state.value} onChange={this.handlerChange}/>
+            </>
+        );
+    }
+}
+```
+
+- 对用户输入的内容进行限制
+
+```jsx
+class App extends React.Component {
+    state = { 
+        value:""
+    }
+
+    handlerChange = (e) => {
+        const newValue = e.target.value.split("").map(item => {
+            if(!isNaN(item)){
+                return item
+            }
+        }).join("")
+        this.setState({
+            value: newValue
+        })
+    }
+
+    render() {
+        return (
+            <>
+                <input 
+                    type="text" 
+                    value={this.state.value} 
+                    onChange={this.handlerChange}
+                    placeholder="只能输入数字"
+                />
+            </>
+        );
+    }
+}
+```
+
+- 文本域
+
+```jsx
+class App extends React.Component {
+    state = { 
+        value:""
+    }
+
+    handlerChange = (e) => {
+        const newValue = e.target.value.split("").map(item => {
+            if(!isNaN(item)){
+                return item
+            }
+        }).join("")
+        this.setState({
+            value: newValue
+        })
+    }
+
+    render() {
+        return (
+            <>
+                <textarea 
+                    cols="30" 
+                    rows="10" 
+                    value={this.state.value} 
+                    onChange={this.handlerChange}    
+                />
+            </>
+        );
+    }
+}
+```
+
+- 多选框
+
+```jsx
+class App extends React.Component {
+    state = { 
+        checkBoxs:[
+            {
+                content: "vue",
+                checked: true
+            },
+            {
+                content: "react",
+                checked: true
+            },
+            {
+                content: "angular",
+                checked: false
+            },
+            {
+                content: "svelte",
+                checked: false
+            },
+        ]
+    }
+
+    handleChange = (index)=>{
+        const arr = [...this.state.checkBoxs]
+        arr[index].checked = !arr[index].checked
+        this.setState({
+            checkBoxs:arr
+        })
+    }
+
+    render() {
+        return (
+            <>
+                {   
+                    this.state.checkBoxs.map((item,index) => {
+                        return (
+                            <div key={index}>
+                                <input 
+                                    type="checkbox" 
+                                    value={item.content} 
+                                    checked={item.checked}
+                                    onChange={()=>this.handleChange(index)} 
+                                />
+                                <span>{item.content}</span>
+                            </div>
+                        )
+                    })
+                }
+            </>
+        );
+    }
+}
+```
+
+- 下拉列表
+
+```jsx
+class App extends React.Component {
+    state = { 
+        value:"apple"
+    }
+
+    handleChange = (e) => {
+        this.setState({
+            value : e.target.value
+        })
+    }
+
+    render() {
+        return (
+            <>
+                <select 
+                    value={this.state.value}
+                    onChange={this.handleChange}
+                >
+                    <option value="pear">桃子</option>
+                    <option value="apple">苹果</option>
+                    <option value="bnana">香蕉</option>
+                </select>
+            </>
+        );
+    }
+}
+```
+
+
+#### 非受控组件
+
+> 大多数情况下，React推荐使用受控组件来对表单进行操作，这样能够对表单控件的数据进行一个统一管理
+> 但在某些特殊情况，需要使用以前传统的DOM方案处理，此时代替方案就是非受控组件
+
+- 非受控组件基本示例
+
+```jsx
+class App extends React.Component {
+
+    constructor() {
+        super();
+        // 创建了一个ref,后i按可以获取和ref绑定的dom元素
+        this.inpuRef = React.createRef();
+    }
+
+    clickHandle = () => {
+        // 获取ref绑定的dom元素
+        console.log(this.inpuRef.current);
+        // 获取到dom的value
+        console.log(this.inpuRef.current.value);
+    }
+
+    render() {
+        return (
+            <div>
+                <input type="text" ref={this.inpuRef}/>
+                <button onClick={this.clickHandle}>获取输入</button>
+            </div>
+        );
+    }
+}
+```
+
+- 非受控组件的默认值
+
+```jsx
+return (
+    {/* 如果使用value，react认为你是受控组件 */}
+    {/* 如果想要设置默认值，就是用defaultValue */}
+    <input type="text" ref={this.inpuRef} defaultValue={123}/>
+    <button onClick={this.clickHandle}>获取输入</button>
+)
+```
+
+- 文件上传
+
+`<input type="file"/>`始终是一个非受控组件，因为它的值只能由用户设置
+
+```jsx
+class App extends React.Component {
+
+    constructor() {
+        super();
+        this.uploadRef = React.createRef();
+    }
+
+    clickHandle = () => {
+        console.log(this.uploadRef.current.files[0]);
+    }
+
+    render() {
+        return (
+            <div>
+                <input type="file" ref={this.uploadRef} />
+                <button onClick={this.clickHandle}>点击</button>
+            </div>
+        );
+    }
+}
+```
+
