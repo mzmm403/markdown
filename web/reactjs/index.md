@@ -1095,3 +1095,357 @@ class App extends React.Component {
 }
 ```
 
+
+
+###　生命周期
+
+- 什么是生命周期
+- 常用的生命周期钩子函数
+
+#### 什么是生命周期
+
+生命周期指组件从诞生到销毁经历的一系列过程，该过程叫做生命周期
+React在组件的生命周期中提供了一系列钩子函数(类似于事件),
+**生命周期钩子函数是属于类组件所独有的东西**,
+从`React16.8`推出Hooks以来，整体已经开始以函数组件为主
+生命周期(常用)如下图
+![alt text](image-5.png)
+展示不常用的如下图
+![alt text](image-4.png)
+
+
+#### 常用的生命周期钩子函数
+
+官方在介绍这些钩子函数的时候也分为了`常用`和`不常用`两大块来介绍
+这里介绍常用的生命周期钩子函数如下：
+
+- constructor
+    > 主要用来做初始化操作的
+    - 同一个组件对象只会创建一次
+    - 不能再第一次挂载到页面之前，调用setState，为了避免问题，构造函数中严禁使用setState
+
+- render
+    > 必须要的，用于渲染
+    - 返回一个虚拟DOM，会被挂载到虚拟DOM树中，最终渲染到页面的真实DOM中
+    - render可能不止运行一次，只需要重新渲染，就会重新运行
+    - 严禁使用setState，因为可能会导致无限递归渲染
+
+- componentDidMount
+    > 类于vue的mounted
+    - 只会执行一次
+    - 可以使用setState
+    - 通常情况下，会将网络请求、启动计时器等一开始需要的操作，书写到该函数中
+
+- componentWillUnmount
+    - 通常在改函数中销毁一些组件依赖的资源，比如计时器
+
+- componentDidUpdaet
+    > 类于vue的updated
+    - 每次更新都会执行
+
+
+### Hooks
+
+- Hooks基本介绍
+- useState和useEffect
+- 自定义Hooks
+
+#### Hooks的基本介绍
+
+> Hook是React16.8的新增特性，它可以让你在不编写class的情况下使用state以及其他的React特性
+
+Hooks的出现解决的一下的问题：
+
+- 告别生命周期
+- 告别类组件中的this
+- 告别了繁重的类组件
+
+Hooks的出现是编程范式上面的转变
+编程范式
+- 命令式编程：告诉计算机怎么做，我们需要给计算机指明每一个步骤
+    - 面向过程
+    - 面向对象
+- 声明式编程：告诉计算机我要什么
+    - 函数式编程
+    - DSL(领域专用语言,*HTML、CSS、SQL*)
+声名式编程并不是新的产物，它是和命令式编程同期出现的，但是早期更加流行命令式编程
+
+在学习Hooks的时候，会突然发现多了一些概念，如纯函数、副作用、柯里化、高阶函数等概念
+
+Hooks就是js函数，但是使用它们会有俩个额外的规则：
+- 只能在函数最外层调用Hook。不要在循环、条件或子函数中调用。
+- 只能在React的函数组件中调用Hook，不要在其它的js函数中调用。
+
+
+#### useState和useEffect
+
+> React内置了一些实用的hook,随React更新,Hook的数量海在持续增加
+
+useState：为函数组件添加状态
+useEffect：处理函数副作用的
+
+
+##### useState
+
+- 基本使用
+```jsx
+import { useState } from 'react';
+
+function App(props) {
+
+    // useState的使用
+    // 入参为一个初始值
+    // 返回一个数组，第一个元素为当前值，第二个元素为更新函数
+    let [count, setCount] = useState(0);
+
+    function handleClick(){
+        setCount(++count);
+    }
+
+    return (
+        <div>
+            <div>{ count }</div>
+            <button onClick={handleClick}>+1</button>
+        </div>
+    );
+}
+
+export default App;
+```
+
+- 声明多个state状态
+
+```jsx
+
+import { useState } from 'react';
+
+function App(props) {
+
+    // useState的使用
+    // 入参为一个初始值
+    // 返回一个数组，第一个元素为当前值，第二个元素为更新函数
+    let [count, setCount] = useState(0);
+    // 声明多个状态，直接使用多次useState即可
+    let [name, setName] = useState('zhangsan');
+    let [age, setAge] = useState(18);
+    let [todos,setTodos] = useState([{text:'学习'}]);
+
+    function handleClick(){
+        setCount(++count);
+        setAge(++age);
+    }
+
+    return (
+        <div>
+            <div>姓名：{name}</div>
+            <div>年龄：{age}</div>
+            <div>待办：{todos[0].text}</div>
+            <div>计数：{count}</div>
+            <button onClick={handleClick}>+1</button>
+        </div>
+    );
+}
+
+export default App;
+```
+
+
+##### useEffect
+
+- 副作用的概念
+    - 纯函数：一个确切的参数在你的函数中运行后一定能得到一个确切的值(相同输入，输出也一定相同)，如下：
+    ```js
+    // 纯函数
+
+    function add(a,b){
+        return a + b
+    }
+
+    // 非纯函数
+    total = 0;
+    function add(a,b){
+        total = total + (a+b);
+        return total
+    }
+    ```
+    - 副作用：函数在执行过程中对外部环境产生的任何影响，或者依赖于外部环境的行为。通俗点说，副作用就是函数除了计算返回值以外，还干了别的事
+    - 如果一个函数中存在副作用，那么我们就称该函数不是一个纯函数。
+    - 常见的副作用有发送网络请求、手动修改DOM、读取文件等。以前我们将这些副作用放在生命周期钩子函数中执行，现在我们写到useEffect这个hook里面
+- 基本使用
+
+```jsx
+import { useState,useEffect } from 'react';
+
+function App(props) {
+
+
+    let [count, setCount] = useState(0);
+
+    useEffect(() => {
+        // 书写你要执行的副作用，会在组件完成渲染后执行
+        document.title = `你点击了${count}次`;
+    })
+
+    function handleClick(){
+        setCount(++count);
+    }
+
+    return (
+        <div>
+            <div>你点击了{count}次</div>
+            <button onClick={handleClick}>+1</button>
+        </div>
+    );
+}
+
+export default App;
+```
+
+- 执行清理工作
+
+```jsx
+import { useState,useEffect } from 'react';
+
+function App(props) {
+
+
+    let [count, setCount] = useState(0);
+
+    useEffect(() => {
+        const stopTime = setInterval(() => {
+            console.log("副作用函数执行了")
+        },1000)
+        // 在useEffect中，可以返回一个函数，该函数称为清理函数
+        // 该函数会在下一次渲染后但是在执行副作用操作前执行
+        return () => {
+            clearInterval(stopTime)
+        }
+    })
+
+    function handleClick(){
+        setCount(++count);
+    }
+
+    return (
+        <div>
+            <div>你点击了{count}次</div>
+            <button onClick={handleClick}>+1</button>
+        </div>
+    );
+}
+
+export default App;
+```
+
+- 副作用的依赖
+    - 目前，我们的副作用函数，每次重新渲染后，都会重新执行，有些时候我们是需要设置依赖项，传递第二个参数，第二个参数为一个依赖数组
+    ```jsx
+    import { useState,useEffect } from 'react';
+
+    function App(props) {
+
+
+        let [count, setCount] = useState(0);
+        let [count1, setCount1] = useState(0);
+        let [count2, setCount2] = useState(0);
+
+        useEffect(() => {
+            console.log("执行副作用函数")
+        },
+        // 只依赖于count1和count2
+        [count1,count2]
+        )
+
+        return (
+            <div>
+                <div>count: {count}</div>
+                <button onClick={() => {setCount(++count)}}>+1</button>
+                <div>count1: {count1}</div>
+                <button onClick={() => {setCount1(++count1)}}>+1</button>
+                <div>count2: {count2}</div>
+                <button onClick={() => {setCount2(++count2)}}>+1</button>
+            </div>
+        );
+    }
+
+    export default App;
+    ```
+    - 如果想要副作用直执行一次，传递第二个参数为一个空数组
+    ```jsx
+    import { useState,useEffect } from 'react';
+
+    function App(props) {
+
+
+        let [count, setCount] = useState(0);
+        let [count1, setCount1] = useState(0);
+        let [count2, setCount2] = useState(0);
+
+        useEffect(() => {
+            console.log("执行副作用函数")
+        },
+        // 只执行一次
+        []
+        )
+
+        return (
+            <div>
+                <div>count: {count}</div>
+                <button onClick={() => {setCount(++count)}}>+1</button>
+                <div>count1: {count1}</div>
+                <button onClick={() => {setCount1(++count1)}}>+1</button>
+                <div>count2: {count2}</div>
+                <button onClick={() => {setCount2(++count2)}}>+1</button>
+            </div>
+        );
+    }
+
+    export default App;
+    ```
+
+#### 自定义Hook
+
+> 除了官方内置的hook，我们还可以自定义hook，自定义hook的本质其实就是函数，但是和普通函数还是有一些区别，主要体现在以下两点：
+
+- 自定义hook能够调用诸如useState、useEffect等，普通函数则不能，由此可以通过内置的Hooks获得Fiber的访问方式，可以实现在组件级别存储数据的方案
+- 自定义hooks需要以use开头，普通函数则没有这个限制。使用use开头并不是一个语法或者一个强制性的方案，更像是一个约定
+
+```jsx
+// useTitle.jsx
+import { useState } from 'react';
+
+function useTitle() {
+    let [title, setTitle] = useState("typeScritp");
+
+    return { title, setTitle };
+}
+
+export default useTitle;
+
+// App.jsx
+import { useState } from 'react';
+import useTitle from './useTitle';
+
+function App() {
+
+    let {title,setTitle} = useTitle();
+    let [value,setValue] = useState('');
+
+    function handleClick(){
+        setTitle(value);
+    }
+
+    function handleChange(e){
+        setValue(e.target.value);
+    }
+    return (
+        <div>
+            <h1>{title}</h1>
+            <input type="text" value={value} onChange={handleChange}/>
+            <button onClick={handleClick}>确 定</button>
+        </div>
+    );
+}
+
+export default App;
+```
