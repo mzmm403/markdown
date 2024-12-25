@@ -1449,3 +1449,291 @@ function App() {
 
 export default App;
 ```
+
+## React-router(v6)
+
+
+### 概念及相关介绍
+
+- 前端路由概念
+- react-router
+
+#### 前端路由
+
+- 多页应用时代，前端请求，后端将页面返回给前端，前端渲染
+- 单页应用时代，前端通过js进行页面控制，后端只返回数据
+
+
+#### react-router
+
+官方地址：https://reactrouter.com/
+整个官网分为几大块：
+- Components组件
+- Hooks函数
+- API函数
+
+
+### react-router使用
+
+- json-server快速启动一个服务端
+- react-router的常用组件和Hooks
+
+#### json-server
+
+> 在介绍react-router之前，我们先来简单介绍一下json-server，快速搭建一个服务器
+
+初始化npm和安装json-server
+```bash
+npm init -y
+npm install json-server 
+```
+
+在根目录下创建一个`db.json`文件，内容如下：
+```json
+{
+    "students":[
+        {
+            "name": "David",
+            "age": 31,
+            "phone": "123-456-789",
+            "email": "david@domain.com",
+            "education": "PhD",
+            "graduationschool": "University A",
+            "profession": "Doctor",
+            "profile": "Creative thinker.",
+            "id": 1
+        },
+        {
+            "name": "Ivy",
+            "age": 18,
+            "phone": "777-888-999",
+            "email": "ivy@site.org",
+            "education": "PhD",
+            "graduationschool": "Academy D",
+            "profession": "Engineer",
+            "profile": "Problem solver.",
+            "id": 2
+        },
+        {
+            "name": "Bob",
+            "age": 22,
+            "phone": "444-555-666",
+            "email": "bob@site.org",
+            "education": "PhD",
+            "graduationschool": "Institute B",
+            "profession": "Artist",
+            "profile": "A passionate individual.",
+            "id": 3
+        },
+        {
+            "name": "Alice",
+            "age": 23,
+            "phone": "555-666-777",
+            "email": "alice@gmail.com",
+            "education": "bachelor",
+            "graduationschool": "College C",
+            "profession": "Engineer",
+            "profile": "Detail-oriented professional.",
+            "id": 4
+        },
+        {
+            "name": "Ivyxxx",
+            "age": 21,
+            "phone": "123-456-789",
+            "email": "ivy@yahoo.com",
+            "education": "master",
+            "graduationschool": "Institute B",
+            "profession": "Doctor",
+            "profile": "Creative thinker.",
+            "id": 5
+        },
+        {
+            "name": "Alice",
+            "age": 39,
+            "phone": "123-456-789",
+            "email": "alice@site.org",
+            "education": "master",
+            "graduationschool": "Institute B",
+            "profession": "Artist",
+            "profile": "Detail-oriented professional.",
+            "id": 6
+        },
+        {
+            "name": "Hank",
+            "age": 28,
+            "phone": "111-222-333",
+            "email": "hank@gmail.com",
+            "education": "PhD",
+            "graduationschool": "Academy D",
+            "profession": "Teacher",
+            "profile": "Creative thinker.",
+            "id": 7
+        },
+        {
+            "name": "Charlie",
+            "age": 36,
+            "phone": "111-222-333",
+            "email": "charlie@site.org",
+            "education": "associate",
+            "graduationschool": "College C",
+            "profession": "Engineer",
+            "profile": "Problem solver.",
+            "id": 8
+        },
+        {
+            "name": "Jack",
+            "age": 24,
+            "phone": "987-654-321",
+            "email": "jack@site.org",
+            "education": "master",
+            "graduationschool": "Institute B",
+            "profession": "Artist",
+            "profile": "A passionate individual.",
+            "id": 9
+        },
+        {
+            "name": "Grace",
+            "age": 26,
+            "phone": "987-654-321",
+            "email": "grace@yahoo.com",
+            "education": "bachelor",
+            "graduationschool": "Academy D",
+            "profession": "Lawyer",
+            "profile": "Creative thinker.",
+            "id": 10
+        }
+    ],
+    "classes":[
+        {
+            "id":1,
+            "name": "Class1",
+            "description": "Class1 description"
+        },
+        {
+            "id":2,
+            "name": "Class2",
+            "description": "Class2 description"
+        }
+    ]
+    
+}
+```
+然后在packge.json中添加如下脚本：
+```json
+"scripts":{
+    "json":"json-server --watch db.json"
+}
+```
+这样就可以快速搭建一个服务器了。
+
+#### react-router的常规使用
+
+##### 安装react-router
+
+```shell
+npm install react-router-dom
+```
+
+##### 路由配置基础用法
+
+
+- 编程式路由
+
+*router.js*
+```js
+import Home from './pages/Home';
+import About from './pages/About';
+import Contact from './pages/Contact';
+
+const routes = [
+    {
+        path: '/',
+        element: <Home />,
+    },
+    {
+        path: '/about',
+        element: <About />,
+    },
+    {
+        path: '/contact',
+        element: <Contact />,
+    },
+];
+
+export default routes;
+```
+
+*App.jsx*
+```jsx
+import React from 'react';
+import { BrowserRouter as Router, useRoutes } from 'react-router-dom';
+import routes from './routes';
+
+function AppRoutes() {
+    const element = useRoutes(routes); // 动态生成路由
+    return element;
+}
+
+function App() {
+    return (
+        <Router>
+            <AppRoutes />
+        </Router>
+    );
+}
+
+export default App;
+```
+
+- 声明式路由
+
+*App.jsx*
+```jsx
+import { Routes, Route, Navigate,BrowserRouter} from 'react-router-dom';
+import Home from './components/Home';
+import About from './components/About';
+import Add from './components/Add';
+
+function App() {
+    return (
+        <BrowserRouter>
+            <div id="app" className="container">
+                <div className="content">
+                    <Routes>
+                        {/* route组件中书写对应的路由以及路由对应的组件 */}
+                        <Route path='/home' element={<Home/>}/>
+                        <Route path='/about' element={<About/>}/>
+                        <Route path='/add' element={<Add/>}/>
+                        <Route path='/' element={<Navigate replace to='/home'/>}/>
+                    </Routes>
+                </div>
+            </div>
+        </BrowserRouter>
+    );
+}
+
+export default App;
+```
+
+
+##### 常用的组件
+
+- BrowserRouter：整个前端路由以hisotry模式进行管理，包裹根组件
+- HashRouter：整个前端路由以hash模式进行管理，包裹根组件
+- Routes：类似于v5版本的Switch组件，用于包裹多个Route，主要提供一个上下文的环境
+- Route：在Route组件中书写对应的路由和路由对应的组件
+    - path：路由的路径
+    - element：路由对应的组件
+- Navigate：重定向组件,类似于useNavigate的返回值函数
+- NavLink：类似于Link一样，最终和Link一样被渲染成a标签，但是她与link有区别的是当前连接会有一个名为active的激活样式，所以一般用于顶部或者左侧导航栏
+
+
+##### 常用的Hooks
+
+- useLocation：获取到location对象，然后获取state属性,这往往是其他路由跳转过来的时候，会在state里面传递额外的数据
+- useNavigate：带哦用之后返回一个函数，通过该函数可以做跳转
+- useParams：获取到动态路由传递的参数
+- useRoutes：用来动态生成路由，将原有的jsx写法改成函数写法，便于封装和复用
+
+
+
