@@ -1726,6 +1726,7 @@ export default App;
     - element：路由对应的组件
 - Navigate：重定向组件,类似于useNavigate的返回值函数
 - NavLink：类似于Link一样，最终和Link一样被渲染成a标签，但是她与link有区别的是当前连接会有一个名为active的激活样式，所以一般用于顶部或者左侧导航栏
+- OutLet：嵌套路由的出口，嵌套路由的组件需要写在OutLet里面
 
 
 ##### 常用的Hooks
@@ -1736,4 +1737,175 @@ export default App;
 - useRoutes：用来动态生成路由，将原有的jsx写法改成函数写法，便于封装和复用
 
 
+##### 嵌套路由
 
+*router.jsx*
+
+```jsx
+const routes = [
+    {
+        path: '/',
+        element: <Home />,
+        children: [
+            {
+                path: "children1",
+                element: <Children1 />,
+            },
+            {
+                path: "children2",
+                element: <Children2 />,
+                children:[
+                    {
+                        path: "children1",
+                        element: <Children1 />,
+                    }
+                ]
+            }
+        ]
+    }
+];
+```
+
+*Home.jsx*
+```jsx
+import React from 'react'
+import { Outlet } from 'react-router-dom'
+function Home() {
+    return (
+        <h1>Home</h1>
+        <p>这里是主页</p>
+        // 在home底下的子路由都会被渲染在这里
+        <Outlet />
+    )
+}
+```
+
+##### 路由传参
+
+- 路径参数(path params)
+    - 发送参数
+    ```jsx
+    // 定义路由时指定路径参数的占位符，例如:id
+    <Route path="/user/:id" element={<User />} />
+
+    // 使用<Link>或者useNavigate进行跳转时，传递参数
+    import { Link, useNavigate } from "react-router-dom";
+
+    <Link to="/user/123">go123</Link>
+    const navigate = useNavigate();
+    navigate(`/user/123`);
+    ```
+    
+    - 接收参数
+    ```jsx
+    // 在目标组件中使用useParams获取路径参数
+    
+    import { useParams } from "react-router-dom";
+
+    function User() {
+    const { id } = useParams();
+    return <div>User ID: {id}</div>;
+    }
+    ```
+
+
+- 查询参数(query params)
+    - 发送参数
+    ```jsx
+    import { Link, useNavigate } from "react-router-dom";
+    // 可以直接在url中添加查询参数,使用<Link>或者useNavigate进行跳转时，传递参数
+
+    <Link to="/search?query=react">Search React</Link>
+    const navigate = useNavigate();
+    navigate(`/search?query=react`);
+
+    // 如果需要动态凭借查询参数,可以用 URLSearchParams
+    const params = new URLSearchParams({ query: 'react', page: 2 });
+    navigate(`/search?${params.toString()}`);
+    ```
+
+    - 接收参数
+    ```jsx
+    // 在目标组件中使用useLocation获取location对象，然后通过location.search来访问查询参数
+
+    import { useLocation } from "react-router-dom";
+
+    function Search() {
+    const location = useLocation();
+    const queryParams = new URLSearchParams(location.search);
+    const query = queryParams.get('query');
+    const page = queryParams.get('page');
+    return <div>Search Query: {query}</div>;
+    }
+    ```
+
+
+
+##### 路由守卫
+
+> react-router-dom没有内置的全局守卫，但是可以借助useNavigate和useLocation来实现类似的功能。
+> 下面是一个关于登录状态的路由守卫的例子
+
+```jsx
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
+
+// 模拟的认证逻辑
+const isAuthenticated = () => {
+  // 这里可以替换为你的认证逻辑，例如检查 token 或 session
+  return localStorage.getItem("authToken") !== null;
+};
+
+// 路由守卫组件
+const RequireAuth = ({ children }) => {
+  const location = useLocation();
+
+  if (!isAuthenticated()) {
+    // 未登录时跳转到登录页，并保存当前访问路径用于回跳
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  // 已登录则允许访问
+  return children;
+};
+
+// 示例页面组件
+const Home = () => <h2>Home - 欢迎登录用户</h2>;
+const Login = () => {
+  const location = useLocation();
+  const from = location.state?.from?.pathname || "/";
+
+  const handleLogin = () => {
+    localStorage.setItem("authToken", "example-token"); // 模拟登录
+    window.location.href = from; // 登录成功后跳回原页面
+  };
+
+  return (
+    <div>
+      <h2>Login</h2>
+      <button onClick={handleLogin}>登录</button>
+    </div>
+  );
+};
+
+const About = () => <h2>About - 公共页面</h2>;
+
+export default function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/about" element={<About />} />
+        <Route
+          path="/"
+          element={
+            <RequireAuth>
+              <Home />
+            </RequireAuth>
+          }
+        />
+      </Routes>
+    </Router>
+  );
+}
+```
