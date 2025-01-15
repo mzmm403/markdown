@@ -1909,3 +1909,494 @@ export default function App() {
   );
 }
 ```
+
+## Reudx
+
+### Reudx的介绍
+
+- 什么是状态管理
+- Redux的核心思想
+- React-Reudx的介绍
+
+
+#### 什么是状态管理
+
+> 就是把组件之间需要共享的状态抽取出来，遵循特定约定，统一管理。
+
+组件通常有一些共享的状态，在vue或者react中我们一般会将这部分状态提升至父组件的props中(父组件一般通过prop传递给子组件)，由父组件统一管理共享的状态，状态改变也是由父组件向下传递，但是这样有两个问题：
+- 若是只有两个平级组件没有共同的父组件，往往需要自行构造
+- 状态由父组件自上而下逐层传递，若是组件层级过多，数据传递变得很冗杂
+![alt text](image-6.png)
+
+此时需要一个**统一的仓库**来对组件的状态进行管理,如下图
+![alt text](image-7.png)
+
+#### Redux的核心思想
+
+- **单向数据流**，view发出Action(`store.dispatch(action)`)，Store调用Reducer计算出新的state，若state产生变化，则调用监听函数重新渲染View(`store.subscribe(render)`)
+- **单一数据源**，只有一个Store
+- state是只读的，每次状态更新之后只能返回一个新的state
+- 没有Dispatcher，而是在Store中集成了dispatch方法，`store.dispatch()`是View发出Action的唯一途径
+- 支持使用中间件(Middleware)管理异步数据流
+
+
+- Redux的数据流
+
+    - store： 存储了公共的数据
+    - view： 
+        - 从store获取数据
+        - 触发事件派发action来进行数据更新，action其实是一个描述对象
+
+![alt text](image-9.png)
+
+#### Reudx的介绍
+
+介绍一个浏览器的redux调试工具
+
+![alt text](image-8.png)
+
+在接下来创建仓库store的地方，添加如下代码
+
+```jsx
+export const store = createStore(
+    todoReducer,
+    window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__()
+)
+```
+
+
+#### Redux的基本用法 -- todolist
+
+首先在src目录下创建redux目录，有4个js文件
+
+**store.js**
+> 仓库文件，用来存储数据的
+```js
+// 仓库文件
+// 创建仓库
+
+// 引入createStore方法去创建仓库对象
+import { createStore } from "redux"
+
+// 引入reducer文件
+import { todoReducer } from "./reducers"
+
+// 需要传入一个reducer(纯函数，用于计算最新的状态)
+// 返回一个仓库对象
+export const store = createStore(
+    todoReducer,
+    window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__()
+)
+```
+
+**reducers.js**
+> 用于计算最新的状态(其实就是对仓库里面的数据进行curd的)
+
+```js
+// reducer 用于计算最新的状态
+// 引入actionType常量
+import { ADD,DEL,CHANGE } from './actionType'
+
+
+// 仓库一开始默认的state(数据)
+const defaultState = {
+    list: [
+        {
+            content:"学习vue",
+            status: false
+        },
+        {
+            content:"学习react",
+            status: false
+        },
+        {
+            content:"玩游戏",
+            status: false
+        }
+    ]
+}
+
+/**
+ * 通过这个纯函数会计算出最新的状态
+ * @param {*} state 仓库数据
+ * @param {*} action 描述对象 {type:'ADD',payload:'react'}
+ */
+export function todoReducer(state=defaultState,action){
+    switch(action.type){
+        case ADD: {
+            // 新增的操作
+            const arr = [...state.list]
+            arr.push({
+                content: action.data,
+                status: false,
+            })
+            return {list: arr}
+        }
+        case DEL: {
+            // 删除的操作
+            const arr = [...state.list]
+            arr.splice(action.index,1)
+            return {list: arr}
+        }
+        case CHANGE: {
+            // 修改的操作
+            const arr = [...state.list]
+            arr[action.index].status = !arr[action.index].status
+            return {list: arr}
+        }
+        default: return state;
+    }
+}
+```
+**actionType.js**
+> 这个文件用来描述curd的类型的
+
+```js
+// 描述了action的类型
+
+// 新增
+export const ADD = 'ADD';
+// 删除
+export const DEL = 'DEL';
+// 修改
+export const CHANGE = 'CHANGE';
+```
+
+**actions.js**
+> 这个文件是具体实现curd的方法函数的
+
+```js
+// 生产action对象的函数，我们一般称为actionCreator
+// 把修改派发给reducer，在reducer中修改
+
+import { ADD, DEL, CHANGE } from "./actionType"
+
+/**
+ * 新增的action
+ * @param {*} newItem 新传入的数据
+ */
+export const addListAction = newItem => ({
+    type: ADD,
+    data: newItem
+})
+
+
+/**
+ * 删除的action
+ * @param {*} index 删除的下标
+ */
+export const delListAction = index => ({
+    type: DEL,
+    index: index
+})
+
+/**
+ * 修改的action 
+ * @param {*} index 修改的下表
+ */
+export const changeListAction = index => ({
+    type: CHANGE,
+    index: index,
+})
+
+```
+
+然后我们在全局入口的js文件当中使用redux
+**index.js**
+```js
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+// 导入创建的仓库
+import { store } from "./redux/store"
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+
+
+
+function myRender() {
+    root.render(
+        // 这里实际上就是把仓库以参数的形式传入了根节点
+        <App store={store}/>
+    );
+}
+
+myRender()
+
+// 让redux和react建立关联(让react订阅这个创建的store)
+store.subscribe(myRender)
+```
+
+然后就可以在页面里面进行使用了
+```jsx
+// Input.jsx
+import { useState } from 'react';
+// 引入创建函数
+import { addListAction } from '../redux/actions';
+
+function Input(props) {
+
+    const [value, setValue] = useState('');
+
+    function hanldeClick() {
+        // 将用户填写的内容提交给仓库
+        // dispatch派发一个action对象到reducer里面
+        props.store.dispatch(addListAction(value))
+        setValue('')
+    }
+
+    return (
+        <div className='form-inline'>
+            <input
+                type="text"
+                className="form-control"
+                placeholder='请输入待办事项'
+                style={{
+                    marginRight: 10
+                }}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+            />
+            <button className="btn btn-primary" onClick={hanldeClick}>提交</button>
+        </div>
+    );
+}
+
+export default Input;
+```
+```jsx
+// List.jsx
+import React from 'react';
+import { delListAction,changeListAction } from '../redux/actions';
+
+function List(props) {
+
+    // 在redux通过store.getState()获取到数据
+    const lis = props.store.getState().list.map((item,index) => {
+
+        return (
+            <li key={index} className='text-primary'>
+                <span
+                    onClick={() => props.store.dispatch(changeListAction(index))}
+                    className={["item",item.status ? "completed" : ""].join(" ")}
+                >{ item.content }</span>
+                <button
+                    type="button"
+                    className="close"
+                    onClick={(index) => props.store.dispatch(delListAction(index))}
+                >&times;</button>
+            </li>
+        )
+    })
+
+    return (
+        <div>
+            <ul style={{marginTop: 20}}>
+                { lis }
+            </ul>
+        </div>
+    );
+}
+
+export default List;
+```
+```jsx
+// App.jsx
+import Input from "./components/Input";
+import List from "./components/List";
+import "./css/App.css";
+
+function App(props) {
+    return (
+        <div className="container">
+            <h1 
+                className="lead"
+                style={{
+                    marginBottom: "20px"
+                }}
+            >待办事项</h1>
+            <Input store={props.store}/>
+            <List store={props.store}/>
+        </div>
+    );
+}
+
+export default App;
+```
+
+
+#### react-Reudx的介绍
+
+> Redux是一个独立的第三方库，之后React官方在Redux的基础上推出了React-redux,最新版的React-redux已经全面拥抱Hooks
+
+内置的Hooks如：
+
+- useSelector
+- useDispatch
+- useStore
+
+Redux还推出了Redux Toolkit来简化整个Redux的使用
+因此现在在React应用中，状态管理库一般都是React-redux+Redux Toolkit来简化整个Redux的使用
+
+首先安装两个依赖
+```shell
+npm install @reduxjs/toolkit react-redux
+```
+Redux目录中的4个文件直接简化为2个，有些东西不需要我们再写，会有tookit自动帮我们生成
+
+index.js变化，需要从react-redux中引入Provider的组件，用于提供一个上下文环境，包裹应用的根组件，之后仓库会作为Provider的store属性，不需要再在App.jsx根组件上面挂载
+
+```jsx
+// ...
+import { Provider } from "react-redux"
+// 引入仓库
+import store from "./redux/store"
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+
+root.render(
+    <Provider store={store}>
+        <App />
+    </Provider>
+)
+```
+
+redux的两个文件现在分别是
+**store.js**
+> 
+
+```js
+// configureStore是Redux Toolkit提供的简化工具，用于配置Redux的Store
+// 它封装了一些 Redux 的复杂配置，使开发者更方便地创建 Redux 应用
+import { configureStore } from "reduxjs/toolkit"
+// xxReducer 是一个由 createSlice 函数创建的 Reducer，它定义了与某个状态片段相关的逻辑
+import xxReducer from "./xxSlice"
+
+export default configureStore({
+    reducer: {
+        xx: xxReducer,
+    }
+})
+```
+**xxSlice.js**
+
+```js
+import { createSlice,creatAsyncThunk } from "@reduxjs/toolkit"
+import { getXxListApi } from "../api/xxApi"
+
+// 与服务器通信
+// 获取列表数据
+export const getXxList = creatAsyncThunk(
+    "xx//getXxList",
+    async(_,thunkAPI) => {
+        // 发送ajax请求
+        const response = await getXxListApi()
+        thunkAPI.dispatch(initXxList(response.data))
+    }
+)
+
+export const xxSlice = createSlice({
+    // 配置对象
+    // 命名空间
+    name: "xx",
+    // 默认数据
+    initialState:; {
+        xxList: []
+    },
+    reducers: {
+        // 初始化数据到仓库的xxList里面
+        initXxList: (state, {pauload}) => {
+            state.xxList = payload
+        }
+    }
+})
+
+export const { initXxList } = xxSlice.actions
+export default xxSlice.reducer
+```
+
+现在比如说要在组件或者项目中使用数据如下：
+```jsx
+import { useSelector,useDispatch } from "react-redux"
+import { getXxList } from "../redux/xxSlice"
+
+function App(props) {
+    // 从仓库中获取xx的数据
+    const { xxList } = useSelector(state=>state.xx)
+    // 创建一个dispatch
+    const dispatch = useDispatch()
+
+    useEffect(() => {
+        // 这里获取数据的逻辑改变
+        // 如果没有数据，应该发送请求获取数据
+        // 但是不是在这里直接发送请求，而是要派发一个action到仓库
+        // 仓库里面负责发送异步请求获取数据，然后将获取到的数据填充到前端仓库
+        if(xxList.length <= 0){
+            dispatch(getXxList)
+        }
+    }, [xxList,dispatch])
+}
+```
+
+****
+**总结**
+
+- react-redux是对redux的简化，通过使用一些hooks来简化原来的仓库配置和action配置
+    - useSelector：用来获取仓库里面的数据的钩子函数
+    - useDispatch：用它来分发 Redux 的 actions，用来派发请求函数用来与服务端进行交互的函数
+    - useStore：用于直接访问 Redux Store 对象
+    - createSlice：用于简化创建 Redux 状态片段（slice）及其相关的 Reducer 和 Action
+    - creatAsyncThunk：用于创建异步逻辑（如调用 API）的 Redux Action
+
+- 和后端交互
+    > 一般来讲，当数据发生变化时，不仅是前端的状态库要更新数据，服务端的数据也要更新
+    
+    ![alt text](image-10.png)
+    也就是说每次在触发action的时候前端仓库的数据和后端数据库的数据同时发生相同的改变
+
+
+
+## Antd
+
+早期主要基于React的组件库，对于vue也有vue-antd
+[官网地址](https://ant-design.antgroup.com/index-cn)
+
+### 安装antd
+
+```shell
+# 安装组件库
+npm i antd
+```
+
+```js
+// 引用对应的样式,在index.js中引入
+import "antd/dist/antd.min.css"
+// 这里默认是英文，所以在配置的时候需要更改语言包,还是在index.js
+import zhCN from "antd/es/locale/zh_CN" // 中文语言包
+import { ConfigProvider } from "antd"
+
+// ...
+
+root.render(
+    <ConfigProvider locale={zhCN}>
+        <App />
+    </ConfigProvider>
+)
+```
+
+### 使用antd
+
+```jsx
+import React from 'react';
+import { Button, Flex } from 'antd';
+const App = () => (
+  <Flex gap="small" wrap>
+    <Button type="primary">Primary Button</Button>
+    <Button>Default Button</Button>
+    <Button type="dashed">Dashed Button</Button>
+    <Button type="text">Text Button</Button>
+    <Button type="link">Link Button</Button>
+  </Flex>
+);
+export default App;
+```
