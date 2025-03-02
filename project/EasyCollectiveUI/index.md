@@ -915,7 +915,7 @@ npm whoami
 
 - 这里还要推荐一个包,rimraf，这是一个删除文件的工具
 
-````shell
+```shell
 # 添加项目依赖
 pnpm add rimraf -Dw
 #　在package.json中添加
@@ -969,3 +969,218 @@ npm run release
   - 可以用于提供有关构建的附加信息，如构建时间或构建系统信息
 
 
+### 打包的二次优化
+
+- css的分包处理
+
+  1. 再core的`vite.es.config.ts`文件中添加新的配置参数`cssCodeSplit`，我们在用库模式的时候，这个参数默认是false
+
+    ```ts
+    // build打包的时候将cssCodeSplit设置为true
+        build: {
+            outDir: "dist/es",
+            cssCodeSplit: true,
+            lib:{
+                entry: resolve(__dirname, "./index.ts"),
+                name: "EasyCollectiveUI",
+                fileName: "index",
+                formats: ['es']
+            },
+            rollupOptions: {
+                external: [
+                    'vue',
+                    "@fortawesome/fontawesome-svg-core",
+                    "@fortawesome/free-solid-svg-icons",
+                    "@fortawesome/vue-fontawesome",
+                    "@popperjs/core",
+                    "async-validator"
+                ],
+                output: {
+                    assetFileNames: (assetInfo) => {
+                        if(assetInfo.name === "style.css") return "index.css";
+                        // 在这里加上一个判断，如果是css文件就单独打包到theme文件夹下
+                        if(
+                            assetInfo.type === "asset" && 
+                            /\.(css)$/i.test(assetInfo.name as string)
+                        ){
+                            return 'theme/[name].[ext]'
+                        }
+                        return assetInfo.name as string;
+                    },
+                    manualChunks(id){
+                        if(id.includes('node_modules')){
+                            return "vendor"
+                        }
+                        if(id.includes("packages/hooks")){
+                            return "hooks"
+                        }
+                        if(id.includes("packages/utils")){
+                            return "utils"
+                        }
+                        for (const item of getDirectoriesSync("../components")) {
+                            if(id.includes(`packages/components/${item}`)){
+                                return item
+                            }
+                        }
+                    },
+                },
+            }
+        }
+  ```
+
+  2. 这里我们还要删除core原来`package.json`中的build行为中的move-style动作，因为我们已经在vite.es.config.ts中做了css的分包处理,然后进行打包发现打包后的css文件的theme目录在es目录下。
+    ![alt text](image-1.png)
+    - 因此我们需要把theme目录移除和es同级
+      我们在core目录下自定义一个插件
+      这里我们手动实现清除上次打包的产物和移动css文件到theme目录的动作，所以我们把`core/package.json`中的clean和move-style动作删除
+
+      ```ts
+      // 这个插件实际上就用到了两个生命周期,
+      // 在vite的自定义插件中一般有两种生命周期，vite独有的钩子和通用钩子(一般就是rollup的钩子)
+      // 这个插件是想在打包的时候把上一次打包的css分割出去的产物删除,然后在打包结束的时候把打包后的产物移动到指定目录
+      // 所以这里用到了通用钩子buildStart和buildEnd
+
+      import {each,isFunction} from 'lodash-es'
+      import shell from 'shelljs'
+
+      export default function hooksPlugin({
+          rmFiles = [],
+          beforeBuild,
+          afterBuild,
+      }:{
+          rmFiles?:string[];
+          beforeBuild?:Function;
+          afterBuild?:Function;
+      }){
+          return {
+              // 插件的名字
+              name: 'hooks-plugin',
+              buildStart(){
+                  each(rmFiles,(fName) => shell.rm("-rf",fName));
+                  isFunction(beforeBuild) && beforeBuild();
+              },
+              buildEnd(err?:Error){
+                  !err && isFunction(afterBuild) && afterBuild();
+              }
+          }
+      }
+      ```
+      然后分别在`core/vite.es.config.ts`和`core/vite.umd.config.ts`中注册插件。
+      ```ts
+      // es
+      const TRY_MOVE_STYLES_DELAY = 800 as const
+
+      function moveStyles(){
+          try{
+              readdirSync('./dist/es/theme')
+              shell.mv("./dist/es/theme","./dist")
+          }catch(_){
+              delay(moveStyles,TRY_MOVE_STYLES_DELAY)
+          }
+      }
+
+      export default defineConfig({
+        plugins: [
+            vue(),
+            dts({
+                    tsconfigPath: "../../tsconfig.build.json",
+                    outDir: "dist/types"
+            }),
+            hooks({
+                rmFiles:['./dist/es','./dist/theme','./dist/types'],
+                afterBuild: moveStyles 
+            })
+        ],
+        ...
+      })
+
+      // umd
+      const TRY_MOVE_STYLES_DELAY = 800 as const
+
+      function moveStyles(){
+          try{
+              readFileSync('./dist/umd/index.css.gz')
+              shell.cp("./dist/umd/index.css","./dist/index.css")
+          }catch(_){
+              delay(moveStyles,TRY_MOVE_STYLES_DELAY)
+          }
+      }
+
+      export default defineConfig({
+        plugins: [
+            vue(),
+            compression({
+                include: /.(cjs|css)$/i,
+            }),
+            hooks({
+                rmFiles:["./dist/umd","./dist/index.css"],
+                afterBuild: moveStyles,
+            })
+        ],
+        ...
+      })
+      ```
+
+    - 把umd模式打包的文件进行压缩
+      ```shell
+      # 切换到core目录
+      cd packages/core
+      # 安装一个vite的插件
+      pnpm add vite-plugin-compression2 -D
+      ```
+    在`core/vite.umd.config.ts`中添加插件
+    ```ts
+    import { defineConfig } from 'vite'
+    import vue from "@vitejs/plugin-vue"
+    import { resolve } from 'path'
+    // 新增压缩插件
+    import { compression } from "vite-plugin-compression2"
+
+
+    export default defineConfig({
+        plugins: [
+          vue(),
+          // 新增压缩插件配置，这里只对cjs和css文件进行压缩
+          compression({
+              include: /.(cjs|css)$/i,
+          })
+        ],
+        // 打包构建
+        build: {
+            // 输出目录
+            outDir: "dist/umd",
+            // 库模式
+            lib:{
+                // 入口文件
+                entry: resolve(__dirname, "./index.ts"),
+                // 打包项目名称
+                name: "EasyCollectiveUI",
+                fileName: "index",
+                formats: ['umd']
+            },
+            rollupOptions: {
+                external: ['vue'],
+                output: {
+                    exports: 'named',
+                    globals: {
+                        vue: 'Vue',
+                    },
+                    assetFileNames: (assetInfo) => {
+                        if(assetInfo.name === "style.css") return "index.css";
+                        return assetInfo.name as string;
+                    }
+                },
+            }
+        }
+    })
+    ```
+
+    ![alt text](image-2.png)
+
+    后续使用就是把压缩包上传到cdn上进行后续工作和优化。
+
+- 打包遗留的问题
+
+
+
+- 代码的混淆和条件编译
