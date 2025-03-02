@@ -5,8 +5,10 @@
 ```shell
 # 初始化git
 git init
-# 创建.gitignore文件
+# 创建.gitignore文件(windows)
 type nul > filename.txt # 这边直接手动创建就行
+# 创建.gitignore文件(linux)
+vim .gitignore
 # 创建packages存放子包
 mkdir packages
 # 创建pnpm工作空间
@@ -18,9 +20,11 @@ echo -e 'packages:\n - "packages/*"' > pnpm-workspace.yaml
 pnpm init
 # 切换目录到packages
 cd packages
-# 这里用到init.shell的脚本文件初始化
+# 这里用到init.shell的脚本文件初始化（init.shell脚本内容如下）
 ./init.shell
 ```
+
+*install.shell*
 
 ```shell
 # 切换到packages目录创建必要的目录
@@ -38,7 +42,7 @@ done
 ```
 
 
-
+各个目录对应的功能
 ```bash
 # 创建一个vue-ts的模板的vite的vue的项目,平时写组件看效果的地方
 pnpm create vite play --template vue-ts
@@ -58,12 +62,47 @@ packages
 //  修改各个包里面的packages的name
 // 格式: `@easy-collective-ui/目录名`
 // 只用core底下的用 `easy-collective-ui`
+
+// core/package.json
+{
+  "name": "@easy-collective-ui"
+}
+
+// components/package.json
 {
     "name": "@easy-collective-ui/components"
 }
 
+// docs/package.json
+{
+  "name": "@easy-collective-ui/docs"
+}
+
+// hooks/package.json
+{
+  "name": "@easy-collective-ui/hooks"
+}
+
+// theme/package.json
+{
+  "name": "@easy-collective-ui/theme"
+}
+
+// utils/package.json
+{
+  "name": "@easy-collective-ui/utils"
+}
+
+// play/package.json
+{
+  "name": "@easy-collective-ui/play"
+}
+
+
 // 这样做可以避免和其他库重名
 ```
+
+去项目的根目录安装依赖
 
 ```shell
 # 返回根目录
@@ -74,6 +113,8 @@ pnpm add -Dw typescript@^5.2.2 vite@^5.1.4 vitest@^1.4.0 vue-tsc@^1.8.27 postcss
 # 安装非开发依赖
 pnpm add -w lodash-es@^4.17.21 vue@^3.4.19
 ```
+
+配置根目录的package.json文件
 
 ```json
 // 修改根目录底下的packages文件的name为@easy-collective-ui/workspace
@@ -92,6 +133,7 @@ pnpm add -w lodash-es@^4.17.21 vue@^3.4.19
 
 ```shell
 # 安装子包依赖
+#　这里--filter安装的是对应的后面的子包里面的依赖
 pnpm add -D @vue/test-utils@2.4.5 @vitest/coverage-v8@^1.4.0 jsdom@^24.0.0 --filter @easy-collective-ui/components
 
 pnpm add @popperjs/core@^2.11.8 async-validator@^4.2.5 --filter @easy-collective-ui/components
@@ -103,6 +145,7 @@ pnpm add @popperjs/core@^2.11.8 async-validator@^4.2.5 --filter @easy-collective
     "@easy-collective-ui/components": "workspace:*"
 }
 // 因为core是pnpm包的入口文件
+// 因此这里需要把core和components链接
 ```
 
 ```shell
@@ -564,3 +607,365 @@ jobs:
 ```
 
 上面的`secrets.GH_TOKEN`去github创建，然后放到仓库里的配装项中，下次在推送代码的时候会自动部署
+
+
+
+
+## 打包发布项目
+
+### 打包项目
+
+> 这里打包分为两种版本一种是umd,一种是es。
+
+- 打包完成别人在用我们的组件库的时候没有类型提示，因此我们还要安装一个vite的插件，在core目录底下安装即可
+
+```shell
+pnpm add vite-plugin-dts@3.9.1 -D
+```
+
+- 在入口文件夹也就是core文件夹中创建一个`vite.umd.config.ts` 因为我们这里打包用的是vite
+
+```ts
+import { defineConfig } from 'vite'
+import vue from "@vitejs/plugin-vue"
+import { resolve } from 'path'
+
+export default defineConfig({
+    plugins: [vue()],
+    // 打包构建
+    build: {
+        // 输出目录
+        outDir: "dist/umd",
+        // 库模式
+        lib:{
+            // 入口文件
+            entry: resolve(__dirname, "./index.ts"),
+            // 打包项目名称
+            name: "EasyCollectiveUI",
+            fileName: "index",
+            formats: ['umd']
+        },
+        rollupOptions: {
+            external: ['vue'],
+            output: {
+                exports: 'named',
+                globals: {
+                    vue: 'Vue',
+                },
+                assetFileNames: (assetInfo) => {
+                    if(assetInfo.name === "style.css") return "index.css";
+                    return assetInfo.name as string;
+                }
+            },
+        }
+    }
+})
+```
+
+- 因为我们预期是要把ts的一些类型文件全部分开放到types文件下，且要求core/hooks/components/utils目录下的ts文件支持类型判断,因此在根目录下创建`tsconfig.build.config`文件
+
+```json
+{
+    "extends": "@vue/tsconfig/tsconfig.dom.json",
+    "compilerOptions": {
+        "target": "ES2020",
+        "useDefineForClassFields": true,
+        "module": "ESNext",
+        "lib": ["ES2020", "DOM", "DOM.Iterable"],
+        "skipLibCheck": true,
+
+      /* Bundler mode */
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "noEmit": true,
+        "jsx": "preserve",
+        "jsxImportSource": "vue",
+
+      /* Linting */
+        "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noFallthroughCasesInSwitch": true
+    },
+    "include": [
+        "packages/core/index.ts",
+        "packages/hooks/**/*.ts",
+        "packages/utils/**/*.ts",
+        "packages/components/index.ts",
+        "packages/components/**/*.ts",
+        "packages/components/**/*.vue"
+    ]
+}
+```
+
+
+- core文件夹下的`vite.es.config.ts`文件如下，这里因为要类型判断引入插件dts以及`tsconfig.build.config`文件做打包的类型文件控制：
+
+```ts
+import { defineConfig } from 'vite'
+import vue from "@vitejs/plugin-vue"
+import { resolve } from 'path'
+import dts from 'vite-plugin-dts'
+
+export default defineConfig({
+    plugins: [vue(),dts({
+        tsconfigPath: "../../tsconfig.build.json",
+        outDir: "dist/types"
+    })],
+    // 打包构建
+    build: {
+        // 输出目录
+        outDir: "dist/umd",
+        // 库模式
+        lib:{
+            // 入口文件
+            entry: resolve(__dirname, "./index.ts"),
+            // 打包项目名称
+            name: "EasyCollectiveUI",
+            fileName: "index",
+            formats: ['es']
+        },
+        rollupOptions: {
+            external: [
+                'vue',
+                "@fortawesome/fontawesome-svg-core",
+                "@fortawesome/free-solid-svg-icons",
+                "@fortawesome/vue-fontawesome",
+                "@popperjs/core",
+                "async-validator"
+            ],
+            output: {
+                assetFileNames: (assetInfo) => {
+                    if(assetInfo.name === "style.css") return "index.css";
+                    return assetInfo.name as string;
+                }
+            },
+        }
+    }
+})
+```
+
+
+
+- 对应的入口文件夹下的package.json文件如下
+
+```json
+{
+  "name": "easy-collective-ui",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build-umd": "vite build --config vite.umd.config.ts",
+    "build-es": "vite build --config vite.es.config.ts" 
+  },
+  "keywords": [],
+  "dependencies":{
+    "@easy-collective-ui/components": "workspace:*"
+  },
+  "author": "",
+  "license": "ISC"
+}
+```
+
+
+- 现在对于es来说分包还是不是很理想，因为组件会有很多种以及还有一些工具类型和hooks，因此这里做一个分包
+
+```ts
+import { defineConfig } from 'vite'
+import vue from "@vitejs/plugin-vue"
+import { resolve } from 'path'
+import dts from 'vite-plugin-dts'
+
+// 这里是所有组件名称的数组
+const COMP_NAMES = [
+    "Alert",
+    "Button",
+    "Collapse",
+    "Dropdown",
+    "Form",
+    "Icon",
+    "Input",
+    "Loading",
+    "Message",
+    "MessageBox",
+    "Notification",
+    "Overlay",
+    "Popconfirm",
+    "Select",
+    "Switch",
+    "Tooltip",
+    "Uplaod",
+] as const;
+
+
+
+export default defineConfig({
+    plugins: [vue(),dts({
+        tsconfigPath: "../../tsconfig.build.json",
+        outDir: "dist/types"
+    })],
+    // 打包构建
+    build: {
+        // 输出目录
+        outDir: "dist/es",
+        // 库模式
+        lib:{
+            // 入口文件
+            entry: resolve(__dirname, "./index.ts"),
+            // 打包项目名称
+            name: "EasyCollectiveUI",
+            fileName: "index",
+            formats: ['es']
+        },
+        rollupOptions: {
+            external: [
+                'vue',
+                "@fortawesome/fontawesome-svg-core",
+                "@fortawesome/free-solid-svg-icons",
+                "@fortawesome/vue-fontawesome",
+                "@popperjs/core",
+                "async-validator"
+            ],
+            output: {
+                assetFileNames: (assetInfo) => {
+                    if(assetInfo.name === "style.css") return "index.css";
+                    return assetInfo.name as string;
+                },
+
+                // 这里做了一个分包，按照目录以及组件名称进行的分包
+                manualChunks(id){
+                    if(id.includes('node_modules')){
+                        return "vendor"
+                    }
+                    if(id.includes("packages/hooks")){
+                        return "hooks"
+                    }
+                    if(id.includes("packages/utils")){
+                        return "utils"
+                    }
+                    for (const item of COMP_NAMES) {
+                        if(id.includes(`packages/components/${item}`)){
+                            return item
+                        }
+                    }
+                }
+            },
+        }
+    }
+})
+```
+
+- 分包完以后接着我们要把css样式文件单独放到一个文件家里，这个时候就要一个库
+
+```shell
+pnpm add move-file-cli@^3.0.0 -Dw
+```
+
+- 然后再`core/packages.json`文件中添加新的执行脚本
+
+```json
+"script": {
+  "move-style": "move-file dist/es/index.css dist/index.css"
+}
+```
+
+- 由于我们要串联这些npm的script，所以这个时候需要另外一个包
+```shell
+pnpm add npm-run-all@^4.1.5 -Dw
+```
+- 然后再`core/packages.json`文件中添加新的执行脚本
+
+```json
+// 这里的run-s是串联，run-p是并联
+
+"script": {
+  "build": "run-s build-only move-style",
+  "build-only": "run-p build-es build-umd"
+}
+```
+
+### npm包的发布
+
+> 关于npm发的开发体验
+
+- 关于npm的源管理器，nrm
+```shell
+# 和nvm类似，nrm也是一个npm源管理器
+# 查看当前npm源
+nrm ls
+# 使用npm官方源
+# 在进行npm发部的时候，要使用官方源
+nrm use npm
+```
+
+
+
+- 登录npm账号
+
+```shell
+npm login
+# 到网页进行登录验证
+npm whoami
+# 查看当前是否登录，登录的账户是谁
+```
+
+- 这里还要推荐一个包,rimraf，这是一个删除文件的工具
+
+````shell
+# 添加项目依赖
+pnpm add rimraf -Dw
+#　在package.json中添加
+"clean": "rimraf dist"
+
+#　在项目打包前先清理之前的打包文件
+"build": "run-s clean build-only move-style",
+```
+
+
+
+- 关于包的发部,这里推荐release-it，这是一个发布工具
+
+```shell
+pnpm add release-it -Dw 
+
+# 在package.json中添加
+"release": "release-it"
+
+# 发布
+npm run release
+# 选择版本号然后同意即可
+```
+
+![alt text](image.png)
+
+
+
+
+> 语义化版本号的三个部分
+
+在语义化版本控制(Sematic Versioning, 简称SemVer)中，版本号主要由三个部分组成：主版本号(MAJOR)、次版本号(MINOR)和修订号(PATCH),格式为：`主本号.次版本号.修订号`
+
+
+- 主版本号(MAJOR)
+  - 当你兼容的API修改时，增加主版本号
+  - 这表示该版本包含了重大更改，使用此新版本的用户需要对代码进行响应修改
+
+- 次版本号(MINOR)
+  - 当你添加向下兼容的功能时，增加次版本号
+  - 意味着型版本添加了新功能，但是现有api保持不变，因此使用型版本用户不需要修改代码
+
+- 修订号(PATCH)
+  - 当你做了向下兼容的问题修正时，新增修订号
+  - 这表示新版本修复了一些问题，但并没有引入新功能，使用此版本的用户可以期望获得更稳定的体验
+
+- 与发布版本标识符
+  - 可以附加一个预发布版本标识符(如：`alpha`,`beta`,`rc`等)来标识开发中的版本，通常用于测试阶段
+
+- 构建元数据
+  - 可以用于提供有关构建的附加信息，如构建时间或构建系统信息
+
+
