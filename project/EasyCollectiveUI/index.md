@@ -938,6 +938,8 @@ pnpm add release-it -Dw
 # 发布
 npm run release
 # 选择版本号然后同意即可
+# 在发布前要进行打包
+# 后续的打包在根目录进行完成即可
 ```
 
 ![alt text](image.png)
