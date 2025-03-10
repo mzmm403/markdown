@@ -1180,7 +1180,465 @@ npm run release
     后续使用就是把压缩包上传到cdn上进行后续工作和优化。
 
 - 打包遗留的问题
+  1. Icon组件打包后,css样式由于是封装的,我们同时使用了样式隔离scoped,在进行打包以后由于打包后的代码会共用一段导出sfc的代码,我们可以把这段代码单独打包出来然后进行引用
 
+  ```ts
+  const _export_sfc = (sfc,props) => {
+    const target = sfc.__vccOpts || sfc;
+    for (const [key, val] of props) {
+      target[key] = val;
+    }
+    return target;
+  }
+
+  export {
+    _export_sfc as _
+  }
+  ```
+  2. 上述代码就是各个组件共用的导出代码,我们单独打包这段代码然后进行引用。(这里我是把这个打包以后的代码合并到了utils.ts的文件中,然后进行引用)
+
+  对于`vite.es.config.ts`文件进行改造
+  ```ts
+  manualChunks(id){
+      if(id.includes('node_modules')){
+          return "vendor"
+      }
+      if(id.includes("packages/hooks")){
+          return "hooks"
+      }
+      if(id.includes("packages/utils")){
+          return "utils"
+      }
+      for (const item of getDirectoriesSync("../components")) {
+          if(id.includes(`packages/components/${item}`)){
+              return item
+          }
+      }
+      // 我们这里不妨输出一下id除了上面的if判断以外还有哪些id没有被命中
+      console.log(id)
+  }
+  ```
+  3. 通过运行打包命令后上面就会得到没有被命中的id,这个id就是我们上面提到的导出代码,我们把它单独打包出来,得到id为`plugin-vue:export-helper`
+
+  4. 然后我们修改`vite.es.config.ts`文件,对id为`plugin-vue:export-helper`进行命中然后打包合并`/packages/utils`的分支中
+
+  ```ts
+  if(id.includes("packages/utils") || id.includes("plugin-vue:export-helper")){
+      return "utils"
+  }
+  ```
 
 
 - 代码的混淆和条件编译
+
+  1. 获取到terser的插件(因为涉及到条件编译，因此这里需要使用插件进行打包，而不是直接在vite.config.js中进行配置)
+
+  ```shell
+  # 切换到core目录
+  pnpm add terser @rollup/plugin-terser -D
+  ```
+
+  2. 在`vite.es.config.ts`文件中进行配置
+  ```ts
+  import { defineConfig } from 'vite'
+  import vue from "@vitejs/plugin-vue"
+  import { resolve } from 'path'
+  import dts from 'vite-plugin-dts'
+  import { map, filter, delay } from "lodash-es";
+  import { readdirSync } from 'fs'
+  import shell from 'shelljs'
+  import hooks from './hooksPlugin';
+  import terser from '@rollup/plugin-terser'
+
+  // const COMP_NAMES = [
+  //     "Alert",
+  //     "Button",
+  //     "Collapse",
+  //     "Dropdown",
+  //     "Form",
+  //     "Icon",
+  //     "Input",
+  //     "Loading",
+  //     "Message",
+  //     "MessageBox",
+  //     "Notification",
+  //     "Overlay",
+  //     "Popconfirm",
+  //     "Select",
+  //     "Switch",
+  //     "Tooltip",
+  //     "Uplaod",
+  // ] as const;
+
+  const TRY_MOVE_STYLES_DELAY = 800 as const
+
+  // 定义三个环境
+  const isProd = process.env.NODE_ENV === 'production';
+  const isDev = process.env.NODE_ENV === 'development';
+  const isTest = process.env.NODE_ENV === 'test';
+
+
+  // 读取指定目录下的所有目录名称
+  function getDirectoriesSync(basePath: string) {
+      const entires = readdirSync(basePath, { withFileTypes: true });
+
+      return map(
+          filter(entires,(entry) => entry.isDirectory()),
+          (entry) => entry.name
+      )
+  }
+
+
+  function moveStyles(){
+      try{
+          readdirSync('./dist/es/theme')
+          shell.mv("./dist/es/theme","./dist")
+      }catch(_){
+          delay(moveStyles,TRY_MOVE_STYLES_DELAY)
+      }
+  }
+
+
+
+  export default defineConfig({
+      plugins: [
+          vue(),
+          dts({
+                  tsconfigPath: "../../tsconfig.build.json",
+                  outDir: "dist/types"
+          }),
+          hooks({
+              rmFiles:['./dist/es','./dist/theme','./dist/types'],
+              afterBuild: moveStyles 
+          }),
+          terser({
+              // 压缩相关的
+              compress: {
+                  // 生产环境下开启分号
+                  sequences: isProd,
+                  // 生产环境下参数重命名
+                  arguments: isProd,
+                  // 生产环境下移除console
+                  drop_console: isProd && ["log"],
+                  // 生产环境下移除debugger
+                  drop_debugger: isProd,
+                  // 生产环境下压缩的次数为4次，非生产环境则为1次
+                  passes: isProd ? 4 : 1,
+                  // 全局的定义变量，用于条件编译
+                  global_defs:{
+                      "@DEV": JSON.stringify(isDev),
+                      "@TEST": JSON.stringify(isTest),
+                      "@PROD": JSON.stringify(isProd)
+                  },
+              },
+              // 格式化相关的
+              format: { 
+                  semicolons: false,
+                  shorthand: isProd,
+                  braces: !isProd,
+                  beautify: !isProd,
+                  comments: !isProd,
+              },
+              // 代码混淆相关的
+              mangle: {
+                  // 根级顶层变量做一次丑化
+                  toplevel: isProd,
+                  // 函数内部变量丑化
+                  eval: isProd,
+                  // 保留类名
+                  keep_classnames: isDev,
+                  // 保留函数名
+                  keep_fnames: isDev,
+              }
+          })
+      ],
+      // 打包构建
+      build: {
+          // 输出目录
+          outDir: "dist/es",
+          // css代码分割
+          cssCodeSplit: true,
+          // 
+          minify: false,
+          // 库模式
+          lib:{
+              // 入口文件
+              entry: resolve(__dirname, "./index.ts"),
+              // 打包项目名称
+              name: "EasyCollectiveUI",
+              fileName: "index",
+              formats: ['es']
+          },
+          rollupOptions: {
+              external: [
+                  'vue',
+                  "@fortawesome/fontawesome-svg-core",
+                  "@fortawesome/free-solid-svg-icons",
+                  "@fortawesome/vue-fontawesome",
+                  "@popperjs/core",
+                  "async-validator"
+              ],
+              output: {
+                  assetFileNames: (assetInfo) => {
+                      if(assetInfo.name === "style.css") return "index.css";
+                      if(
+                          assetInfo.type === "asset" && 
+                          /\.(css)$/i.test(assetInfo.name as string)
+                      ){
+                          return 'theme/[name].[ext]'
+                      }
+                      return assetInfo.name as string;
+                  },
+                  manualChunks(id){
+                      if(id.includes('node_modules')){
+                          return "vendor"
+                      }
+                      if(id.includes("packages/hooks")){
+                          return "hooks"
+                      }
+                      if(id.includes("packages/utils") || id.includes("plugin-vue:export-helper")){
+                          return "utils"
+                      }
+                      for (const item of getDirectoriesSync("../components")) {
+                          if(id.includes(`packages/components/${item}`)){
+                              return item
+                          }
+                      }
+                  },
+              },
+          }
+      }
+  }
+  ```
+  3. 在`vite.umd.config.ts`进行配置
+  ```ts
+  import { defineConfig } from 'vite'
+  import vue from "@vitejs/plugin-vue"
+  import { resolve } from 'path'
+  import { compression } from "vite-plugin-compression2"
+  import { readFileSync } from "fs"
+  import shell from "shelljs"
+  import {delay} from "lodash-es"
+  import hooks from './hooksPlugin'
+  import terser from '@rollup/plugin-terser'
+
+  const TRY_MOVE_STYLES_DELAY = 800 as const
+
+  // 定义三个环境
+  const isProd = process.env.NODE_ENV === 'production';
+  const isDev = process.env.NODE_ENV === 'development';
+  const isTest = process.env.NODE_ENV === 'test';
+
+  function moveStyles(){
+      try{
+          readFileSync('./dist/umd/index.css.gz')
+          shell.cp("./dist/umd/index.css","./dist/index.css")
+      }catch(_){
+          delay(moveStyles,TRY_MOVE_STYLES_DELAY)
+      }
+  }
+
+
+  export default defineConfig({
+      plugins: [
+          vue(),
+          compression({
+              include: /.(cjs|css)$/i,
+          }),
+          terser({
+              compress: {
+                  drop_console: ["log"],
+                  drop_debugger: true,
+                  passes: 3,
+                  global_defs:{
+                      "@DEV": JSON.stringify(isDev),
+                      "@TEST": JSON.stringify(isTest),
+                      "@PROD": JSON.stringify(isProd)
+                  },
+              },
+          }),
+          hooks({
+              rmFiles:["./dist/umd","./dist/index.css"],
+              afterBuild: moveStyles,
+          })
+      ],
+      // 打包构建
+      build: {
+          // 输出目录
+          outDir: "dist/umd",
+          // 库模式
+          lib:{
+              // 入口文件
+              entry: resolve(__dirname, "./index.ts"),
+              // 打包项目名称
+              name: "EasyCollectiveUI",
+              fileName: "index",
+              formats: ['umd']
+          },
+          rollupOptions: {
+              external: ['vue'],
+              output: {
+                  exports: 'named',
+                  globals: {
+                      vue: 'Vue',
+                  },
+                  assetFileNames: (assetInfo) => {
+                      if(assetInfo.name === "style.css") return "index.css";
+                      return assetInfo.name as string;
+                  }
+              },
+          }
+      }
+  })
+  ```
+
+  4. 安装cross-env到根目录
+
+  ```shell
+  pnpm add cross-env -Dw
+  ```
+
+  在`packages/core`目录下创建ts文件用于条件编译，这里我以打印logo为例，即`printLogo.ts`
+
+  ```ts
+  export default function () {
+      // 如果是生产环境
+      if(PROD) {
+          const logo = `  
+          -------------------------------------                                                                         
+           _______  ______  _______  _______ 
+          |    ___||      ||   |   ||_     _|
+          |    ___||   ---||   |   | _|   |_ 
+          |_______||______||_______||_______|
+          -------------------------------------
+                  author： Mzmm403
+          `
+          const rainbowGradient = `
+              background: linear-gradient(135deg, orange 60%, cyan);
+              background-clip: text;
+              color: transparent;
+              font-size: 16px;
+              line-height: 1;
+              font-family: monospace;
+              font-weight: 700;
+          `
+          console.log(`%c${logo}`, rainbowGradient)
+      }else if(DEV){
+          // 开发环境
+          console.log("[EasyCollectiveUI]: dev mode...")
+      }
+  }
+  ```
+
+  可以去`patorjk.com`生成对应的logo
+
+  5. 在根目录下添加`env.d.ts`文件
+
+  ```ts
+  declare const PROD: boolean
+  declare const DEV: boolean
+  declare const TEST: boolean
+  ```
+
+  6. 在根目录的`tsconfig.json`和`tsconfig.build.json`中添加
+
+  ```json
+  "include": [
+      // 新增文件路径包含全局环境变量配置文件
+      "env.d.ts",
+      "pckages/**/**/*.ts",
+      "packages/**/*.ts", 
+      "packages/**/*.tsx", 
+      "packages/**/*.vue"
+    ]
+  ```
+
+  我们在vitest测试的时候还需要配置一下，在`vitest.config.ts`中添加
+  ```ts
+  export default defineConfig({
+      plugins: [vue(), vueJsx()],
+      // 新增的地方
+      define: {
+          DEV: JSON.stringify(false),
+          TEST: JSON.stringify(false),
+          PROD: JSON.stringify(true)
+      },
+      test: {
+          globals: true,
+          environment: 'jsdom',
+      }
+  })
+  ```
+
+  然后我们配置最外层的`package.json`
+
+  ```json
+  "scripts": {
+    "dev": "pnpm run build && pnpm --filter @easy-collective-ui/play dev",
+    "story": "pnpm run build && pnpm --filter @easy-collective-ui/play storybook",
+    "docs:dev": "pnpm --filter @easy-collective-ui/docs dev",
+    "docs:build": "pnpm --filter @easy-collective-ui/docs build",
+    "test": "cross-env NODE_ENV=test pnpm --filter @easy-collective-ui/components test",
+    "build": "cross-env NODE_ENV=production pnpm --filter easy-collective-ui build",
+    "build:dev": "cross-env NODE_ENV=development pnpm --filter easy-collective-ui build:watch"
+  }
+  ```
+
+  然后我们更改一下`packages/core`下的`package.json`
+  ```json
+  "scripts": {
+    "build": "run-p build-es build-umd",
+    "build:watch":"run-p build-es:watch build-umd:watch",
+    "build-umd": "vite build --config vite.umd.config.ts",
+    "build-es": "vite build --config vite.es.config.ts",
+    "build-umd:watch": "vite build --watch --config vite.umd.config.ts",
+    "build-es:watch": "vite build --watch --config vite.es.config.ts",
+    "release": "release-it"
+  },
+  ```
+
+  最后再在`packages/core`下的`index.ts`文件中引入`printLogo.ts`
+
+  ```ts
+  import printLogo from "./printLogo"
+
+  printLogo()
+  ```
+
+  7. 如果你想你可以对css进行混淆，因为我们在做打包配置的时候关闭了混合模式，因此我们可以通过以下方式进行css的混淆
+
+  首先下载`cssnano`插件
+  ```shell
+  pnpm install cssnano -Dw
+  ```
+
+  然后我们对于根目录下的`postcss.config.cjs`文件进行插件注册
+
+  ```cjs
+  /* eslint-env node */
+  module.exports = {
+      plugins: [
+          require("postcss-nested"),
+          require("postcss-each-variables"),
+          require("postcss-each")({
+              plugins: {
+                  beforeEach: [require("postcss-for"), require("postcss-color-mix")],
+              },
+          }),
+          // 引入cssnano插件开启css混淆功能
+          require("cssnano")({ preset: "default" })
+      ],
+  };
+  ```
+
+
+至此，打包的一些事项基本完成，最后打包的目录如下
+![alt text](image-3.png)
+
+这里我们不经可以全局引入css还可以按需引入
+比如我们这里对于storybook的配置而言我们可以按下方图中按需引入
+
+首先引入css全局变量
+![alt text](image-5.png)
+然后按需引入组件样式文件
+![alt text](image-4.png)
