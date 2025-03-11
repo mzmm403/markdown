@@ -1644,3 +1644,134 @@ npm run release
 ![alt text](image-5.png)
 然后按需引入组件样式文件
 ![alt text](image-4.png)
+
+
+## 项目文档
+
+> 这里可以用storybook打包好的文档进行直接部署，也可用vitepress进行文档编写部署
+
+这里我们采用vitepress以及@vitepress-demo-preview/component和@vitepress-demo-preview/plugin的插件进行文档的编写以及功能的预览
+
+```shell
+pnpm add @vitepress-demo-preview/component @vitepress-demo-preview/plugin
+```
+
+修改 `docs/.vitepress/config.ts` 添加 markdown 配置：
+
+```ts
+import { defineConfig } from 'vitepress'
+import { componentPreview, containerPreview } from '@vitepress-demo-preview/plugin'
+
+// https://vitepress.dev/reference/site-config
+export default defineConfig({
+  title: "Easy-Collective-UI",
+  description: "一款基于vue3的组件库",
+  base:"/EasyCollectiveUI/",
+  head: [["link", { rel: "icon", href: "favicon.png" }]],
+  themeConfig: {
+    // https://vitepress.dev/reference/default-theme-config
+    nav: [
+      { text: '开始使用', link: '/get-started' },
+      { text: '组件', link: '/components/button' }
+    ],
+    search: {
+      provider: 'local'
+    },
+    sidebar: [
+      {
+        text: '指南',
+        collapsed: false,
+        items: [
+          { text: '快速开始', link: '/get-started' },
+        ]
+      },
+      {
+        text: "基础组件",
+        collapsed: false,
+        items: [
+          { text: "Button 按钮", link: "components/button" }
+        ],
+      },
+      {
+        text: "数据展示",
+        collapsed: false,
+        items: [
+          { text: "Collapse 折叠面板",link: "components/collapse" }
+        ]
+      },
+      {
+        text: "反馈组件",
+        collapsed: false,
+        items: [
+          { text: "Alert 提示", link: "components/alert" }
+        ]
+      }
+    ],
+
+    socialLinks: [
+      { icon: 'github', link: 'https://github.com/mzmm403/EasyCollectiveUI' }
+    ],
+    footer: {
+        copyright:"Copyright © 2024-present Mzmm"
+    }
+  },
+  markdown: {
+    theme: {
+      light: 'vitesse-light',
+      dark: 'vitesse-dark'
+    },
+    lineNumbers: true,
+    config:(md) => {
+      md.use(componentPreview)
+      md.use(containerPreview)
+    }
+  }
+})
+```
+
+在 `.vitepress` 下新建目录 `theme`，并在 `theme` 目录中创建 `index.ts`
+
+```ts
+import type { App } from 'vue'
+import { AntDesignContainer } from '@vitepress-demo-preview/component'
+import DefaultTheme from 'vitepress/theme'
+import EasyCollectivUI from 'easy-collective-ui';
+import '@vitepress-demo-preview/component/dist/style.css'
+import "easy-collective-ui/dist/index.css"
+
+export default {
+    ...DefaultTheme,
+    enhanceApp({ app }: {app: App}) {
+        app.component('demo-preview', AntDesignContainer)
+        app.use(EasyCollectivUI)
+    }
+}
+```
+
+这样便完成了 @vitepress-demo-preview 的配置，接下来就可以在组件文档中编写demo了。
+在 `docs` 目录下创建 `demo` 目录，该目录存放文档中编写的`demo`，如定义一个 `button/Basic.vue` 文件：
+
+```vue
+<template>
+  <el-button type="primary">测试按钮</el-button>
+</template>
+```
+
+在 docs/compnents/button.md 中使用该 Demo：
+
+```md
+## 基础用法
+
+基本用法
+
+::: preview
+demo-preview=../demo/button/Basic.vue
+:::
+```
+
+最后的成品如下图：
+
+![alt text](image-6.png)
+
+
+这里有个约定就是图片这种静态资源放在根目录下的public文件夹下，这样在`github CI/CD`的时候才能正确访问到资源
