@@ -487,3 +487,192 @@ export default defineConfig({
 
 ## rollup
 
+> rollup是一个以ESM标准为目标的构建工具，支持tree-shaking，支持多种插件等。
+
+
+### rollup的命令使用
+
+rollup的安装如下：
+
+```shell
+npm i rollup -g
+```
+
+rollup的命令使用如下：
+
+```shell
+#  查看版本
+rollup -v
+# -i 指定入口文件
+# -file 指定输出文件
+# --format 指定输出格式
+rollup -i main.js -file bundle.js --format iife
+# --dir 指定输出目录
+rollup -i a.js -i b.js --dir dist
+# --watch 监听文件变化
+# --config 指定配置文件
+# --environment 指定环境变量
+# --plugin 指定插件
+```
+
+format的类型如下：
+- iife
+- cjs
+- es
+- umd (cjs+amd+iife的结合体)
+ 
+rollup的配置文件简单使用如下：
+
+```js
+export default {
+  input: "main.js",
+  output: {
+    file: "bundle.js",
+    format: "iife"
+  }
+}
+```
+
+### rollup配置文件
+
+> 下面是关于rollup配置文件的一些基础配置`rollup.config.js`
+
+
+```js
+// 默认导出可以是一个对象也可以是一个数组
+// 下面以数组为例
+export default [
+  {
+    input: "index.js",
+    external: ["lodash"],
+    plugins: [resolve(), commonjs()],
+    output: [
+      {
+        file: "dist/bundle.umd.js",
+        format: "umd",
+        banner: "/*! banner */",
+      },
+      {
+        file: "dist/bundle.esm.js",
+        format: "es",
+        plugins: [terser()]
+      }
+    ]
+  },
+  {
+    input: "main.js",
+    output: {
+      file: "dist/main.cjs.js",
+      format: "cjs"
+    }
+  }
+]
+```
+
+对于上面的配置文件，有如下：
+- input： 指定入口文件
+- external： 指定不打包的文件
+- plugins： 指定插件
+- output： 指定输出配置
+- file： 指定输出文件
+- format： 指定输出格式
+- banner： 指定输出的头部(一般是一些作者的信息或者是组件的一些信息)
+
+
+### rollup插件
+
+> rollup插件的使用很简单，只需要在配置文件中引入即可
+
+流程如下：
+
+inpute => rollup main => 插件1 => 插件2 => ... => emit file => finish
+
+> 大部分插件可以直接在vite中使用的，下面介绍三个官方插件
+
+#### alias
+
+- 安装使用
+
+```shell
+npm i @rollup/plugin-alias
+```
+
+```js
+import alias from "@rollup/plugin-alias"
+
+export default {
+  plugins: [alias()]
+}
+```
+
+#### resolve
+
+- 安装使用
+
+```shell
+npm i @rollup/plugin-alias
+```
+
+```js
+import alias from "@rollup/plugin-alias"
+
+export default {
+  plugins: [alias({
+    entries: {
+      "@": path.resolve(__dirname, "src")
+    }
+  })]
+}
+```
+
+
+#### babel
+
+- 安装使用
+
+```shell
+npm i @rollup/plugin-babel -D
+```
+
+```js
+import { babel} from "@rollup/plugin-babel"
+
+export default {
+  plugins: [babel({
+    exclude: "node_modules/**",
+    presets: ["@babel/preset-env"]
+  })]
+}
+```
+
+#### rollup的hook
+
+[hook的文档](https://www.rollupjs.com/plugin-development/#buildend)
+
+- buildEnd
+- buildStart
+- closeWatcher
+- load
+- moduleParsed
+- options
+- resolvDyamicImport
+- tranform
+- watchChange
+- augmentChunkHash
+- bannner
+- closeBundle
+- footer
+- generateBundle
+- intro
+- outputOpions
+- outro
+- renderChunk
+- renderDynaimcImport
+- renderError
+- renderStart
+- resolveFileUrl
+- resolveImportMeta
+- wrtieBundle
+
+
+#### 常用插件推荐
