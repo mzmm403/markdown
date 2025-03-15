@@ -121,14 +121,14 @@ server.listen(8080,()=>{
 - createRenderer：创建一个渲染器
 - renderToString：渲染器的方法，有三个参数分别是vue实例，上下文对象，回调函数
 - 需要用注释的方式指定渲染结果渲染的位置`<!--vue-ssr-outlet-->`这个注释和普通的注释不一样前面和后面都不能为空
-- 关于插值语法，在这里`{{}}`其内容是进行转义的，`{{{}}}`其内容是不转义的
+- 关于插值语法，在这里双括号其内容是进行转义的，三括号其内容是不转义的
 
 ## ssr的环境搭建
 
 这里有两种方式进行搭建
 
 ```shell
-npx create-nuxt-app <项目名>
+npx create-nuxt-app 项目名
 npm create vite@latst
 ```
 
