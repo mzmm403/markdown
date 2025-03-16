@@ -45,6 +45,7 @@ export default defineConfig({
         text: '项目',
         items: [
           { text: 'EasyCollectiveUI', link: '/project/EasyCollectiveUI/index' },
+          { text: 'mzmm-cli', link: '/project/mzmm-cli/index' },
         ]
       }
     ],
