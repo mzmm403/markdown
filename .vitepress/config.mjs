@@ -30,7 +30,7 @@ export default defineConfig({
           { text: "vue-hiprint", link: "/web/vue-plugin-hiprint/index" },
           { text: "webpack", link: "/web/web-pack/index" },
           { text: "vite", link: "/web/vite/index" },
-          { text: "electron", link: "/web/Electron/index" },
+          { text: "electron", link: "/web/electron/index" },
           { text: "i18n", link: "/web/other/i18n/index" },
           { text: "oauth", link: "/web/other/otherLogin/index" }
         ],
