@@ -55,7 +55,7 @@ export default defineConfig({
         text: "ai",
         items: [
           { text: "relevant-knowledge", link: "/ai/relevant-knowledge/index" },
-          { text: "LangChain", link:"/ai/LangChain/index" },
+          { text: "LangChain", link:"/ai/langchain/index" },
           { text: "mcp", link:"/ai/mcp/index" },
           { text: "ai-base", link:"/ai/ai-base/index" },
         ]
