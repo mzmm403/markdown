@@ -2,6 +2,10 @@ import { defineConfig } from "vitepress";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
+  ignoreDeadLinks:[
+    /^http:\/\/localhost:/, // 忽略本地服务 
+    /^https?:\/\/127\.0\.0\.1/
+  ],
   base: "/markdown/",
   title: "Mzmm知识库",
   description: "share knowledge",
