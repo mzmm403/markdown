@@ -503,6 +503,19 @@ a {
 ```
 按住红色区域即可拖拽
 
+这里使用了`-webkit-app-region: drag;`属性，会出现一个问题，那就是双击红色区域会放大窗口，这是因为样式实现拖拽的时候使得该元素与系统级别的窗口管理器交互，它不仅使元素可以用于拖拽窗口，而且可能还会响应系统对标题栏区域默认的双击事件
+
+该问题在`macOS`上即使你设置了无边框窗口，禁止了最大化和调整窗口大小，双击仍然会出现窗口放大或者移动的问题，在`windows`上
+我们可以通过下面两个api来解决这个问题
+
+```ts
+// 设置窗口是否可以由用户手动最大化
+mainWindow.setMenu(null)
+// 设置用户是否可以调节窗口大小
+mainWindow.setMaximizable(false)
+```
+
+
 3. 无标题栏无标题
 
 这个时候我们需要设置主进程的`BrowserWindow`的`frame`属性
@@ -513,7 +526,7 @@ const win = new BrowserWindow({
 })
 ```
 
-这样窗口就没有累了标题和标题栏，这个时候有一个特殊的业务场景，例如音乐平台的歌词窗口，任意按住哪一个位置就能拖动，
+这样窗口就没有了标题和标题栏，这个时候有一个特殊的业务场景，例如音乐平台的歌词窗口，任意按住哪一个位置就能拖动，
 这个时候用上面的案例来解决问题就一个非常大的问题，那就是拖动的盒子覆盖在业务上，如果下层有一些业务交互，这个时候鼠标就点击不了
 
 这个时候我们需要用到鼠标的事件来判断
@@ -724,7 +737,7 @@ const win = new BrowserWindow({
 ```
 
 
-#### 关闭窗口
+### 关闭窗口
 
 ```ts
 // 用于关闭窗口，可以通过监听close事件来执行一些自定义操作，并有机会取消关闭操作
@@ -737,5 +750,59 @@ app.quit()
 app.exit()
 ```
 
+
+### 窗口最大化
+
+```ts
+
+//electron 的写法
+ipcMain.handle('full-screen',() => {
+  // 判断当前是否全屏
+  if(mainWindow.isFullScreen()) {
+    // 如果是全屏就退出全屏状态
+    mainWindow.setFullScreen(false);
+  }else{
+    // 否则进入全屏状态
+    mainWindow.setFullScreen(true);
+  }
+})
+
+
+// 纯js的实现
+const isFull: boolean = !!(document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.msFullscreenElement)
+
+if(isFull) {
+  // 退出全屏状态
+  if (document.exitFullscreen) {
+    document.exitFullscreen();
+  } else if (document.msExitFullscreen) {
+    document.msExitFullscreen();
+  } else if (document.mozCancelFullScreen) {
+    document.mozCancelFullScreen();
+  } else if (document.webkitExitFullscreen) {
+    document.webkitExitFullscreen();
+  }
+}else{
+  // 进入全屏状态
+  let elem: HTMLElement = document.documentElement;
+  if (elem.requestFullscreen) {
+    elem.requestFullscreen();
+  } else if (elem.msRequestFullscreen) {
+    elem.msRequestFullscreen();
+  } else if (elem.mozRequestFullScreen) {
+    elem.mozRequestFullScreen();
+  } else if (elem.webkitRequestFullscreen) {
+    elem.webkitRequestFullscreen();
+  }
+}
+```
+
+
 todo: 
   - 如何换肤
+  - 动态路由
+  - 记住密码
+  - bug: electron 最大化 > flex + el组件 + min-width:auto 导致布局错乱(宽度会自动撑大)
+  - 字典: minix，store，hook
+  - 全局组件
+  - el-dialog 内滚动

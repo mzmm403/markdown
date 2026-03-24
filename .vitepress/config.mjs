@@ -17,23 +17,30 @@ export default defineConfig({
       {
         text: "前端",
         items: [
+          { text: "webpack", link: "/web/web-pack/index" },
+          { text: "vite", link: "/web/vite/index" },
+          { text: "monorepo", link: "/web/monorepo/index" },
+          { text: "nodejs", link: "/web/nodejs/nodejs" },
           { text: "vue", link: "/web/vuejs/vue" },
           { text: "react", link: "/web/reactjs/index" },
+          { text: "electron", link: "/web/electron/index" },
+          { text: "nuxtjs", link: "/web/nuxtjs/nuxtjs" },
           { text: "vue全家桶", link: "/web/myrouter/router" },
           { text: "vitest", link: "/web/vitest/index" },
           { text: "less", link: "/web/css-less/index" },
           { text: "css&js", link: "/web/css-js/css-js" },
           { text: "ts", link: "/web/myts/ts" },
           { text: "threejs", link: "/web/thressjs/threejs" },
-          { text: "nodejs", link: "/web/nodejs/nodejs" },
-          { text: "nuxtjs", link: "/web/nuxtjs/nuxtjs" },
           { text: "vue-hiprint", link: "/web/vue-plugin-hiprint/index" },
-          { text: "webpack", link: "/web/web-pack/index" },
-          { text: "vite", link: "/web/vite/index" },
-          { text: "electron", link: "/web/electron/index" },
-          { text: "i18n", link: "/web/other/i18n/index" },
-          { text: "oauth", link: "/web/other/otherLogin/index" }
         ],
+      },
+      {
+        text: '经验之谈',
+        items: [
+          { text: "i18n", link: "/coding/i18n/index" },
+          { text: "oauth", link: "/coding/otherLogin/index"},
+          { text: "工作流", link: "/coding/workflow/index"}
+        ]
       },
       {
         text: "运维",
@@ -47,7 +54,11 @@ export default defineConfig({
       {
         text: "ai",
         items: [
-          { text: "base-knowledge", link: "/ai/relevant-knowledge/index" },
+          { text: "relevant-knowledge", link: "/ai/relevant-knowledge/index" },
+          { text: "LangChain", link:"/ai/LangChain/index" },
+          { text: "mcp", link:"/ai/mcp/index" },
+          { text: "mcp", link:"/ai/mcp/index" },
+          { text: "ai-base", link:"/ai/ai-base/index" },
         ]
       },
       {
